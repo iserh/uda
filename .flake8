@@ -1,0 +1,14 @@
+[flake8]
+select = ANN,B9,E,F,I,W,D
+ignore = """
+    SC100,SC200 # misspelled words
+    E800 # commented out code
+    BLK  # code formatting with black
+    ANN101 # Missing type annotation for self in method
+    D415 # First line should end with a period, question mark, or exclamation point
+    D403 # First word of the first line should be properly capitalized
+    S301 # Pickle and modules that wrap it can be unsafe when used to deserialize untrusted data, possible security issue.
+    """
+max-complexity = 10
+max-line-length= 120
+docstring-convention = google
