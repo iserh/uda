@@ -27,6 +27,9 @@ flake8-isort = ">=3.0.0"
 flake8-use-fstring = ">=1.1"
 isort = ">=4.3.21"
 nox = ">=2020.5.24"
+pytest = "^7.1.1"
+pytest-cov = "^3.0.0"
+pytest-mock = "^3.7.0"
 reindent = ">=3.5.1"
 tomlkit = ">=0.7.0"
 [tool.isort]
@@ -36,6 +39,18 @@ force_grid_wrap = 0
 use_parentheses = true
 ensure_newline_before_comments = true
 line_length = 120
+
+[tool.pytest.ini_options]
+addopts = "-v --cov --cov-report=html --cov-report=term"
+testpaths = "tests"
+
+[tool.coverage.run]
+branch = true
+source = ["uda"]
+omit = ["**/__init__.py"]
+
+[tool.coverage.report]
+show_missing = true
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

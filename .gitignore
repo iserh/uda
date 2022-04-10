@@ -1,6 +1,9 @@
 **/.DS_Store
 **/__pycache__
+htmlcov
+
 
 .vscode
 .nox
 poetry.lock
+.coverage
