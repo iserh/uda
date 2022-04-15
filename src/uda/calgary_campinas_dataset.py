@@ -1,219 +1,148 @@
-"""Loader for the Calgary Campinas dataset.
-
-Author: Rasha Sheikh
-"""
-import os
-from typing import List, Tuple
+"""Loader for the Calgary Campinas dataset."""
+from pathlib import Path
+from typing import List, Optional, Tuple
 
 import nibabel as nib
 import numpy as np
 import torch
+from nibabel.spatialimages import SpatialImage
 from sklearn.model_selection import KFold
 from sklearn.preprocessing import MinMaxScaler
 from torch.utils.data import Dataset
+from tqdm import tqdm
 
 
 class CalgaryCampinasDataset(Dataset):
     """Dataset class for loading Calgary Campinas dataset."""
 
+    D, W, H = 200, 256, 256
+
     def __init__(
         self,
         data_path: str,
-        site: int = 2,
+        vendor: str,
+        fold: Optional[int] = None,
         train: bool = True,
-        fold: int = -1,
         rotate: bool = True,
-        scale: bool = True,
-        subj_index: List = [],
+        flatten: bool = False,
+        random_state: int = 42,
     ) -> None:
-        """Initialize Calgary Campinas dataset.
-
-        Args:
-            data_path : Dataset location
-            site : Site (Vendor). Defaults to 2.
-            train : Use train partition. Defaults to True.
-            fold : Fold index. Defaults to -1.
-            rotate : Rotate the images. Defaults to True.
-            scale : Scale the images. Defaults to True.
-            subj_index : Index of the subject. Defaults to [].
+        """Args:
+        `data_path` : Dataset location
+        `vendor` : vendor
+        `fold` : Fold index for cross-validation
+        `train` : Whether to load training or test partition (only when fold is not None)
+        `rotate` : Rotate the images
+        `flatten` : Flatten the Z dimension
+        `random_state` : Random state for cross-validation
         """
-        self.rotate = rotate
-        self.scale = scale
+        self.vendor = vendor
         self.fold = fold
         self.train = train
-        self.subj_index = subj_index
-        self.site = site
-
-        if site == 1:
-            self.folder = "GE_15"
-        elif site == 2:
-            self.folder = "GE_3"
-        elif site == 3:
-            self.folder = "Philips_15"
-        elif site == 4:
-            self.folder = "Philips_3"
-        elif site == 5:
-            self.folder = "Siemens_15"
-        elif site == 6:
-            self.folder = "Siemens_3"
-        else:
-            self.folder = "GE_3"
-
+        self.rotate = rotate
+        self.flatten = flatten
+        self.random_state = random_state
         self.load_files(data_path)
 
-    def get_fold(self, files: np.ndarray) -> List[str]:
-        """Get the files list for the current fold.
+    def select_fold(self, files: List[str]) -> List[str]:
+        kf = KFold(n_splits=3, shuffle=True, random_state=self.random_state)
 
-        Args:
-            files : Fille name array
+        files = np.array(files)
+        for i, (train_indices, test_indices) in enumerate(kf.split(files)):
+            if i == self.fold:
+                indices = train_indices if self.train else test_indices
 
-        Returns:
-            List of filenames
-        """
-        kf = KFold(n_splits=3)
-        folds = kf.split(files)
-        k_i = 1
-        for train_indices, test_indices in folds:
-            if k_i == self.fold:
-                if self.train:
-                    indices = train_indices
-                else:
-                    indices = test_indices
-                break
-            k_i += 1
-        return files[indices]
+        return files[indices].tolist()
 
-    def pad_image(self, img: np.ndarray) -> np.ndarray:
-        """Pad image to the same size.
+    def pad_images(self, images: List[np.ndarray], mode: str = "edge") -> List[np.ndarray]:
+        padded_images = []
+        for x in images:
+            # crop image
+            if x.shape[0] > self.D or x.shape[1] > self.W or x.shape[2] > self.H:
+                x = x[: self.D, : self.W, : self.H]
+            # pad image
+            if x.shape[0] < self.D or x.shape[1] < self.W or x.shape[2] < self.H:
+                x = np.pad(x, ((0, self.D - x.shape[0]), (0, self.W - x.shape[1]), (0, self.H - x.shape[2])), mode=mode)
 
-        Args:
-            img : images array
+            padded_images.append(x)
 
-        Returns:
-            Padded images array
-        """
-        s, h, w = img.shape
-        if h < w:
-            b = (w - h) // 2
-            a = w - (b + h)
-            return np.pad(img, ((0, 0), (b, a), (0, 0)), mode="edge")
-        elif w < h:
-            b = (h - w) // 2
-            a = h - (b + w)
-            return np.pad(img, ((0, 0), (0, 0), (b, a)), mode="edge")
-        else:
-            return img
+        return padded_images
 
-    def pad_image_w_size(self, data_array: np.ndarray, max_size: int) -> np.ndarray:
-        """Pad images.
+    def pad_voxel_dims(self, voxel_dims: List[np.ndarray], mode: str = "constant") -> List[np.ndarray]:
+        padded_voxel_dims = []
+        for v in voxel_dims:
+            # crop array
+            if v.shape[0] > self.D:
+                v = v[: self.D]
+            # pad array
+            if v.shape[0] < self.D:
+                v = np.pad(v, ((0, self.D - v.shape[0]), (0, 0)), mode=mode)
 
-        Args:
-            img : images array
+            padded_voxel_dims.append(v)
 
-        Returns:
-            Padded images array
-        """
-        current_size = data_array.shape[-1]
-        b = (max_size - current_size) // 2
-        a = max_size - (b + current_size)
-        return np.pad(data_array, ((0, 0), (b, a), (b, a)), mode="edge")
-
-    def unify_sizes(self, input_images: np.ndarray, input_labels: np.ndarray) -> np.ndarray:
-        """Unify the size of the images.
-
-        Args:
-            input_images : Input images array
-            input_labels : Input labels array
-
-        Returns:
-            Unified images array
-        """
-        sizes = np.zeros(len(input_images), np.int)
-        for i in range(len(input_images)):
-            sizes[i] = input_images[i].shape[-1]
-        max_size = np.max(sizes)
-        for i in range(len(input_images)):
-            if sizes[i] != max_size:
-                input_images[i] = self.pad_image_w_size(input_images[i], max_size)
-                input_labels[i] = self.pad_image_w_size(input_labels[i], max_size)
-        return input_images, input_labels
+        return padded_voxel_dims
 
     def load_files(self, data_path: str) -> None:
-        """Load files.
+        data_path = Path(data_path)
 
-        Args:
-            data_path : Dataset location
-        """
-        self.sagittal = True
+        images_dir = data_path / "Original" / self.vendor
+        files = list(images_dir.glob("*.nii.gz"))
+        if self.fold is not None:
+            files = self.select_fold(files)
 
-        scaler = None
-        if self.scale:
-            scaler = MinMaxScaler()
-        images = []
-        labels = []
-        self.voxel_dim = []
+        scaler = MinMaxScaler()
 
-        images_path = os.path.join(data_path, "Original", self.folder)
+        images, labels, voxel_dims = [], [], []
+        for file in tqdm(files, desc="Loading files"):
+            nib_img: SpatialImage = nib.load(file)
+            img = nib_img.get_fdata("unchanged", dtype=np.float32)
 
-        files = np.array(sorted(os.listdir(images_path)))
-        if self.fold > 0:
-            files = self.get_fold(files)
-        if len(self.subj_index) > 0:
-            files = files[self.subj_index]
-        for i, f in enumerate(files):
-            nib_file = nib.load(os.path.join(images_path, f))
-            img = nib_file.get_fdata("unchanged", dtype=np.float32)
-            print(i, f, img.shape)
-            lbl = nib.load(os.path.join(data_path, "Silver-standard", self.folder, f[:-7] + "_ss.nii.gz")).get_fdata(
-                "unchanged", dtype=np.float32
-            )
-            if self.scale:
-                transformed = scaler.fit_transform(np.reshape(img, (-1, 1)))
-                img = np.reshape(transformed, img.shape)
-            if not self.sagittal:
-                img = np.moveaxis(img, -1, 0)
+            label_path = data_path / "Silver-standard" / self.vendor / (file.name[:-7] + "_ss.nii.gz")
+            nib_label: SpatialImage = nib.load(label_path)
+            label = nib_label.get_fdata("unchanged", dtype=np.float32)
+
+            # scale the images
+            img = scaler.fit_transform(img.reshape(-1, 1)).reshape(img.shape)
+
             if self.rotate:
-                img = np.rot90(img, axes=(1, 2))
-            if img.shape[1] != img.shape[2]:
-                img = self.pad_image(img)
+                img = np.rot90(img, k=-1, axes=(1, 2))
+                label = np.rot90(label, k=-1, axes=(1, 2))
+
+            spacing = np.array([nib_img.header.get_zooms()] * img.shape[0])
+
             images.append(img)
+            labels.append(label)
+            voxel_dims.append(spacing)
 
-            if not self.sagittal:
-                lbl = np.moveaxis(lbl, -1, 0)
-            if self.rotate:
-                lbl = np.rot90(lbl, axes=(1, 2))
-            if lbl.shape[1] != lbl.shape[2]:
-                lbl = self.pad_image(lbl)
-            labels.append(lbl)
-            spacing = [nib_file.header.get_zooms()] * img.shape[0]
-            self.voxel_dim.append(np.array(spacing))
+        images = np.stack(self.pad_images(images))
+        labels = np.stack(self.pad_images(labels))
+        voxel_dims = np.stack(self.pad_voxel_dims(voxel_dims))
 
-        images, labels = self.unify_sizes(images, labels)
+        if self.flatten:
+            images = images.reshape(-1, *images.shape[-2:])
+            labels = labels.reshape(-1, *labels.shape[-2:])
+            voxel_dims = voxel_dims.reshape(-1, voxel_dims.shape[-1])
 
-        self.data = np.expand_dims(np.vstack(images), axis=1)
-        self.label = np.expand_dims(np.vstack(labels), axis=1)
-        self.voxel_dim = np.vstack(self.voxel_dim)
-
-        self.data = torch.from_numpy(self.data)
-        self.label = torch.from_numpy(self.label)
-        self.voxel_dim = torch.from_numpy(self.voxel_dim)
+        # insert channel dimension
+        self.data = torch.from_numpy(images).unsqueeze(1)
+        self.label = torch.from_numpy(labels).unsqueeze(1)
+        self.voxel_dim = torch.from_numpy(voxel_dims).unsqueeze(1)
 
     def __len__(self) -> int:
-        """Get the length of the dataset.
-
-        Returns:
-            Length of the dataset
-        """
         return len(self.data)
 
     def __getitem__(self, idx: int) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        """Get the item.
-
-        Returns:
-            Tuple of data, label and voxel_dim
-        """
         data = self.data[idx]
         labels = self.label[idx]
         voxel_dim = self.voxel_dim[idx]
 
         return data, labels, voxel_dim
+
+
+if __name__ == "__main__":
+    data_path = Path("/home/iailab36/iser/uda-data")
+    dataset = CalgaryCampinasDataset(data_path, vendor="GE_3", fold=1, train=True, flatten=True)
+
+    print(dataset.data.shape)
+    print(dataset.label.shape)
+    print(dataset.voxel_dim.shape)

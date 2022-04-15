@@ -11,7 +11,7 @@ nox.options.sessions = (
 )  # set sessions for default call
 nox.options.reuse_existing_virtualenvs = True  # -r option as default
 
-locations = "src", "tests", "noxfile.py"
+locations = "src", "tests", "scripts", "noxfile.py"
 # location_with_files = "/src/**/*.py", "/tests/**/*.py", "noxfile.py"  # maybe obsolete
 python_versions = ["3.9"]
 
