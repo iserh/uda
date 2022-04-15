@@ -23,11 +23,6 @@ max_line_length = config["flake8"]["max-line-length"]
 
 @nox.session(python=python_versions)
 def lint(session: Session) -> None:
-    """Lint using flake8.
-
-    Args:
-        session (Session): Nox session
-    """
     session.install(
         "flake8",
         "flake8-annotations",
@@ -43,11 +38,6 @@ def lint(session: Session) -> None:
 
 @nox.session(python=python_versions)
 def format(session: Session) -> None:
-    """Format code.
-
-    Args:
-        session (Session): Nox session
-    """
     args = session.posargs or locations
     session.install("black", "isort", "docformatter", "reindent", "tomlkit")
     session.run("isort", "--atomic", *args)
@@ -68,10 +58,5 @@ def format(session: Session) -> None:
 
 @nox.session(python=python_versions)
 def depsort(session: Session) -> None:
-    """Sort the dependencies in pyproject.toml alphabetically.
-
-    Args:
-        session (Session): Nox session
-    """
     session.install("tomlkit")
     session.run("poetry", "run", "python", "pyproject_sort.py", external=True)
