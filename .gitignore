@@ -9,10 +9,7 @@ htmlcov
 # files
 .coverage
 poetry.lock
-notebooks/unet_model.pt
-notebooks/unet_config.json
 
 # extensions
 **/*.code-workspace
 **/*.tif
-
