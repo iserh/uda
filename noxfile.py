@@ -33,7 +33,6 @@ def lint(session: Session) -> None:
         "flake8-annotations",
         "flake8-bugbear",
         "flake8-builtins",
-        "flake8-docstrings",
         "flake8-isort",
         "flake8-use-fstring",
     )

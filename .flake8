@@ -1,5 +1,5 @@
 [flake8]
-select = ANN,B9,E,F,I,W,D
+select = ANN,B9,E,F,I,W
 ignore = """
     SC100,SC200 # misspelled words
     E800 # commented out code

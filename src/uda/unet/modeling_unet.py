@@ -14,11 +14,6 @@ class NNModules:
     """`torch.nn` Modules with different dimensionality."""
 
     def __init__(self, dim: int = 2) -> None:
-        """Initialize the `NNModules` class.
-
-        Args:
-            dim : The dimensionality of the modules. Defaults to 2.
-        """
         if dim == 1:
             self.ConvNd = nn.Conv1d
             self.ConvTransposeNd = nn.ConvTranspose1d
@@ -39,14 +34,12 @@ class NNModules:
 
 
 class StackedConvBlock(nn.Module):
-    """Stacked Convolutions backbone block."""
+    """U-Net block consisting of a convolutional stack with ReLU activations in between."""
 
     def __init__(self, hidden_sizes: List[int], dim: int) -> None:
-        """Create a stack of convolutional layers with ReLU activations in between.
-
-        Args:
-            hidden_sizes : Number of channels in each convolutional layer.
-            dim : Dimensionality of the input tensor.
+        """Args:
+        `hidden_sizes` : Number of channels in each convolutional layer.
+        `dim` : Dimensionality of the input tensor.
         """
         super().__init__()
         nn_ = NNModules(dim)
@@ -67,14 +60,6 @@ class StackedConvBlock(nn.Module):
             self.convs.append(conv)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """Forward pass through the stack of convolutional layers.
-
-        Args:
-            x : Input tensor.
-
-        Returns:
-            Output tensor.
-        """
         for conv in self.convs:
             x = conv(x)
         return x
@@ -84,11 +69,9 @@ class ResBlock(nn.Module):
     """Residual block with shortcut connection."""
 
     def __init__(self, hidden_sizes: List[int], dim: int) -> None:
-        """Create a residual block.
-
-        Args:
-            hidden_sizes : Number of channels in each convolutional layer.
-            dim : Dimensionality of the input tensor.
+        """Args:
+        `hidden_sizes` : Number of channels in each convolutional layer.
+        `dim` : Dimensionality of the input tensor.
         """
         super().__init__()
         nn_ = NNModules(dim)
@@ -125,14 +108,6 @@ class ResBlock(nn.Module):
             self.conv_shortcut = None
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """Forward pass through the residual block.
-
-        Args:
-            x : Input tensor.
-
-        Returns:
-            Output tensor.
-        """
         identity = x
         out = self.conv1(x)
         out = self.bn1(out)
@@ -151,14 +126,12 @@ class ResBlock(nn.Module):
 
 
 class ResNetBlock(nn.Module):
-    """ResNet backbone block."""
+    """U-Net block consisting of ResNet."""
 
     def __init__(self, hidden_sizes: List[int], dim: int) -> None:
-        """Create a ResNet backbone block.
-
-        Args:
-            hidden_sizes : Number of channels in each residual block.
-            dim : Dimensionality of the input tensor.
+        """Args:
+        `hidden_sizes` : Number of channels in each residual block.
+        `dim` : Dimensionality of the input tensor.
         """
         super().__init__()
         self.res_blocks = nn.ModuleList()
@@ -167,28 +140,12 @@ class ResNetBlock(nn.Module):
             self.res_blocks.append(res_block)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """Forward pass through the ResNet backbone block.
-
-        Args:
-            x : Input tensor.
-
-        Returns:
-            Output tensor.
-        """
         for res_block in self.res_blocks:
             x = res_block(x)
         return x
 
 
 def _get_backbone_class(backbone: str) -> Union[Type[StackedConvBlock], Type[ResNetBlock]]:
-    """Get the class of the backbone.
-
-    Args:
-        backbone : Name of the backbone.
-
-    Returns:
-        The class of the backbone.
-    """
     if backbone == UNetBackbones.StackedConvolutions:
         return StackedConvBlock
     elif backbone == UNetBackbones.ResNet:
@@ -198,14 +155,9 @@ def _get_backbone_class(backbone: str) -> Union[Type[StackedConvBlock], Type[Res
 
 
 class UNetEncoder(nn.Module):
-    """Encoder for the U-Net."""
+    """Encoder part of U-Net."""
 
     def __init__(self, config: UNetConfig) -> None:
-        """Create a U-Net encoder.
-
-        Args:
-            config : Configuration for the U-Net.
-        """
         super().__init__()
         nn_ = NNModules(dim=config.dim)
 
@@ -218,14 +170,6 @@ class UNetEncoder(nn.Module):
         self.max_poolNd = nn_.max_poolNd
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """Forward pass through the encoder.
-
-        Args:
-            x : Input tensor.
-
-        Returns:
-            Output tensor.
-        """
         # apply initial encoder block
         x = self.blocks[0](x)
 
@@ -244,14 +188,9 @@ class UNetEncoder(nn.Module):
 
 
 class UNetDecoder(nn.Module):
-    """Decoder for the U-Net."""
+    """Decoder part of U-Net."""
 
     def __init__(self, config: UNetConfig) -> None:
-        """Create a U-Net encoder.
-
-        Args:
-            config : Configuration for the U-Net.
-        """
         super().__init__()
         nn_ = NNModules(dim=config.dim)
 
@@ -287,15 +226,6 @@ class UNetDecoder(nn.Module):
         )
 
     def forward(self, x: torch.Tensor, hidden_states: List[torch.Tensor]) -> torch.Tensor:
-        """Forward pass through the decoder.
-
-        Args:
-            x : Input tensor.
-            hidden_states : Hidden states from encoder.
-
-        Returns:
-            Output tensor.
-        """
         for block, up_conv, hidden_state in zip(self.blocks, self.up_convs, reversed(hidden_states)):
             x = up_conv(x)
             x = torch.cat([x, hidden_state], dim=1)
@@ -306,50 +236,24 @@ class UNetDecoder(nn.Module):
 
 
 class UNet(nn.Module):
-    """Base class for all UNets."""
+    """U-Net segmentation model."""
 
     def __init__(self, config: UNetConfig) -> None:
-        """Create U-Net.
-
-        Args:
-            config : Configuration for the U-Net.
-        """
         super().__init__()
         self.config = config
         self.encoder = UNetEncoder(config)
         self.decoder = UNetDecoder(config)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """Forward pass through the 3D U-Net.
-
-        Args:
-            x : Input tensor.
-
-        Returns:
-            Output tensor.
-        """
         x, hidden_states = self.encoder(x)
         x = self.decoder(x, hidden_states)
         return x
 
     def save(self, path: str) -> None:
-        """Save the model.
-
-        Args:
-            path : Path to save the model to.
-        """
-        # save parameters
         torch.save(self.state_dict(), path)
 
     @classmethod
     def from_pretrained(cls, path: str, config: UNetConfig) -> "UNet":
-        """Load a pretrained model.
-
-        Args:
-            path : Path to load the model from.
-            config : Configuration for the U-Net.
-        """
-        # load parameters
         model = cls(config)
         model.load_state_dict(torch.load(path))
         return model
