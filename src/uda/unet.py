@@ -1,15 +1,20 @@
 """Unet 3D Network."""
+from dataclasses import dataclass
 from typing import List, Tuple, Type
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-DIMS = 3
-CONVOLUTION = nn.Conv2d if DIMS == 2 else nn.Conv3d
-MAX_POOL = F.max_pool2d if DIMS == 2 else F.max_pool3d
-UP_CONVOLUTION = nn.ConvTranspose2d if DIMS == 2 else nn.ConvTranspose3d
-BATCH_NORM = nn.BatchNorm2d if DIMS == 2 else nn.BatchNorm3d
+
+@dataclass
+class _NN:
+    """Modules."""
+
+    ConvNd = nn.Conv2d
+    ConvTransposeNd = nn.ConvTranspose2d
+    BatchNormNd = nn.BatchNorm2d
+    max_poolNd = F.max_pool2d
 
 
 class StackedConvBlock(nn.Module):
@@ -25,7 +30,7 @@ class StackedConvBlock(nn.Module):
         self.convs = nn.ModuleList()
         for in_channels, out_channels in zip(hidden_sizes[:-1], hidden_sizes[1:]):
             conv = nn.Sequential(
-                CONVOLUTION(
+                _NN.ConvNd(
                     in_channels=in_channels,
                     out_channels=out_channels,
                     kernel_size=3,
@@ -61,7 +66,7 @@ class ResBlock(nn.Module):
             hidden_sizes : Number of channels in each convolutional layer.
         """
         super().__init__()
-        self.conv1 = CONVOLUTION(
+        self.conv1 = _NN.ConvNd(
             in_channels=hidden_sizes[0],
             out_channels=hidden_sizes[1],
             kernel_size=3,
@@ -69,8 +74,8 @@ class ResBlock(nn.Module):
             padding=1,
             bias=False,
         )
-        self.bn1 = BATCH_NORM(hidden_sizes[1])
-        self.conv2 = CONVOLUTION(
+        self.bn1 = _NN.BatchNormNd(hidden_sizes[1])
+        self.conv2 = _NN.ConvNd(
             in_channels=hidden_sizes[1],
             out_channels=hidden_sizes[2],
             kernel_size=3,
@@ -78,9 +83,9 @@ class ResBlock(nn.Module):
             padding=1,
             bias=False,
         )
-        self.bn2 = BATCH_NORM(hidden_sizes[2])
+        self.bn2 = _NN.BatchNormNd(hidden_sizes[2])
         if hidden_sizes[0] != hidden_sizes[-1]:
-            self.conv_shortcut = CONVOLUTION(
+            self.conv_shortcut = _NN.ConvNd(
                 in_channels=hidden_sizes[0],
                 out_channels=hidden_sizes[-1],
                 kernel_size=1,
@@ -88,7 +93,7 @@ class ResBlock(nn.Module):
                 padding=0,
                 bias=False,
             )
-            self.bn_shortcut = BATCH_NORM(hidden_sizes[-1])
+            self.bn_shortcut = _NN.BatchNormNd(hidden_sizes[-1])
         else:
             self.conv_shortcut = None
 
@@ -164,7 +169,7 @@ class Encoder(nn.Module):
         # encoder blocks
         self.blocks = nn.ModuleList([Backbone(channels) for channels in blocks])
         # batch norm after last encoder block
-        self.batch_norm = BATCH_NORM(blocks[-1][-1]) if batch_norm else None
+        self.batch_norm = _NN.BatchNormNd(blocks[-1][-1]) if batch_norm else None
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Forward pass through the encoder.
@@ -182,7 +187,7 @@ class Encoder(nn.Module):
         for block in self.blocks[1:]:
             hidden_states.append(x)
             # max pooling downsampling
-            x = MAX_POOL(x, kernel_size=2, stride=2)
+            x = _NN.max_poolNd(x, kernel_size=2, stride=2)
             x = block(x)
 
         # batch norm after last encoder block
@@ -220,7 +225,7 @@ class Decoder(nn.Module):
         else:
             self.up_convs = nn.ModuleList(
                 [
-                    UP_CONVOLUTION(
+                    _NN.ConvTransposeNd(
                         in_channels=channels[0],
                         out_channels=channels[0] // 2,
                         kernel_size=2,
@@ -232,7 +237,7 @@ class Decoder(nn.Module):
             )
 
         # maps to classes
-        self.mapping_conv = CONVOLUTION(
+        self.mapping_conv = _NN.ConvNd(
             in_channels=blocks[-1][-1],
             out_channels=n_classes,
             kernel_size=1,
@@ -260,8 +265,8 @@ class Decoder(nn.Module):
         return x
 
 
-class Unet3D(nn.Module):
-    """3D U-Net."""
+class _UnetND(nn.Module):
+    """N-D U-Net for N in (1,2,3)`."""
 
     def __init__(
         self,
@@ -272,7 +277,7 @@ class Unet3D(nn.Module):
         decoder_backbone: Type[nn.Module] = StackedConvBlock,
         batch_norm_after_encoder: bool = True,
     ) -> None:
-        """Create a 3D U-Net.
+        """Create a N-D U-Net.
 
         Args:
             encoder_blocks : Number of channels for each convolutional layer in each encoder block.
@@ -300,7 +305,100 @@ class Unet3D(nn.Module):
         return x
 
 
-if __name__ == "__main__":
+class Unet1D(_UnetND):
+    """1D U-Net."""
+
+    def __init__(
+        self,
+        encoder_blocks: Tuple[Tuple[int]],
+        decoder_blocks: Tuple[Tuple[int]],
+        n_classes: int,
+        encoder_backbone: Type[nn.Module] = StackedConvBlock,
+        decoder_backbone: Type[nn.Module] = StackedConvBlock,
+        batch_norm_after_encoder: bool = True,
+    ) -> None:
+        """Create a 1D U-Net.
+
+        Args:
+            encoder_blocks : Number of channels for each convolutional layer in each encoder block.
+            decoder_blocks : Number of channels for each convolutional layer in each decoder block.
+            n_classes : Number of classes in the output.
+            encoder_backbone : Backbone to use for the encoder blocks.
+            decoder_backbone : Backbone to use for the decoder blocks.
+            batch_norm_after_encoder : Whether to use batch normalization after last encoder block.
+        """
+        _NN.ConvNd = nn.Conv1d
+        _NN.ConvTransposeNd = nn.ConvTranspose1d
+        _NN.BatchNormNd = nn.BatchNorm1d
+        _NN.max_poolNd = F.max_pool1d
+        super().__init__(
+            encoder_blocks, decoder_blocks, n_classes, encoder_backbone, decoder_backbone, batch_norm_after_encoder
+        )
+
+
+class Unet2D(_UnetND):
+    """2D U-Net."""
+
+    def __init__(
+        self,
+        encoder_blocks: Tuple[Tuple[int]],
+        decoder_blocks: Tuple[Tuple[int]],
+        n_classes: int,
+        encoder_backbone: Type[nn.Module] = StackedConvBlock,
+        decoder_backbone: Type[nn.Module] = StackedConvBlock,
+        batch_norm_after_encoder: bool = True,
+    ) -> None:
+        """Create a 2D U-Net.
+
+        Args:
+            encoder_blocks : Number of channels for each convolutional layer in each encoder block.
+            decoder_blocks : Number of channels for each convolutional layer in each decoder block.
+            n_classes : Number of classes in the output.
+            encoder_backbone : Backbone to use for the encoder blocks.
+            decoder_backbone : Backbone to use for the decoder blocks.
+            batch_norm_after_encoder : Whether to use batch normalization after last encoder block.
+        """
+        _NN.ConvNd = nn.Conv2d
+        _NN.ConvTransposeNd = nn.ConvTranspose2d
+        _NN.BatchNormNd = nn.BatchNorm2d
+        _NN.max_poolNd = F.max_pool2d
+        super().__init__(
+            encoder_blocks, decoder_blocks, n_classes, encoder_backbone, decoder_backbone, batch_norm_after_encoder
+        )
+
+
+class Unet3D(_UnetND):
+    """3D U-Net."""
+
+    def __init__(
+        self,
+        encoder_blocks: Tuple[Tuple[int]],
+        decoder_blocks: Tuple[Tuple[int]],
+        n_classes: int,
+        encoder_backbone: Type[nn.Module] = StackedConvBlock,
+        decoder_backbone: Type[nn.Module] = StackedConvBlock,
+        batch_norm_after_encoder: bool = True,
+    ) -> None:
+        """Create a 3D U-Net.
+
+        Args:
+            encoder_blocks : Number of channels for each convolutional layer in each encoder block.
+            decoder_blocks : Number of channels for each convolutional layer in each decoder block.
+            n_classes : Number of classes in the output.
+            encoder_backbone : Backbone to use for the encoder blocks.
+            decoder_backbone : Backbone to use for the decoder blocks.
+            batch_norm_after_encoder : Whether to use batch normalization after last encoder block.
+        """
+        _NN.ConvNd = nn.Conv3d
+        _NN.ConvTransposeNd = nn.ConvTranspose3d
+        _NN.BatchNormNd = nn.BatchNorm3d
+        _NN.max_poolNd = F.max_pool3d
+        super().__init__(
+            encoder_blocks, decoder_blocks, n_classes, encoder_backbone, decoder_backbone, batch_norm_after_encoder
+        )
+
+
+if __name__ == "__main__":  # pragma: no cover
     from torchsummaryX import summary
 
     device = "cuda:0" if torch.cuda.is_available() else "cpu"
@@ -358,4 +456,6 @@ if __name__ == "__main__":
     # model summary
     df = summary(model, x).reset_index()
     # print only convolutional layers
-    print(df[df["Layer"].apply(lambda x: "Conv3d" in x and "conv_shortcut" not in x)])
+    print(
+        df[df["Layer"].apply(lambda layer: ("Conv3d" in layer or "Conv2d" in layer) and "conv_shortcut" not in layer)]
+    )

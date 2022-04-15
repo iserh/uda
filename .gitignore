@@ -1,10 +1,12 @@
+# folders
 **/.DS_Store
 **/__pycache__
+.nox
+.pytest_cache
+.vscode
 htmlcov
 
-
-.vscode
-.nox
-poetry.lock
+# files
 .coverage
+poetry.lock
 *.code-workspace
