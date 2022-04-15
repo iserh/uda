@@ -10,21 +10,11 @@ from uda.unet import UNet, UNetBackbones, UNetConfig
 
 @pytest.fixture
 def device() -> str:
-    """Return the device to use for testing.
-
-    Returns:
-        str: The device to use for testing.
-    """
     return "cuda:0" if torch.cuda.is_available() else "cpu"
 
 
 @pytest.fixture()
 def unet_config_default() -> UNetConfig:
-    """Create the default UNet configuration.
-
-    Returns:
-        UNetConfig: The default UNet configuration.
-    """
     return UNetConfig(
         n_classes=2,
         encoder_blocks=[
@@ -46,12 +36,6 @@ def unet_config_default() -> UNetConfig:
 
 
 def test_unet_1d(unet_config_default: UNetConfig, device: str) -> None:
-    """Test the unet model with dim=1.
-
-    Args:
-        unet_config_default : The configuration to use for testing.
-        device : The device to use for testing.
-    """
     # change the default configuration
     unet_config_default.dim = 1
     # create model
@@ -69,12 +53,6 @@ def test_unet_1d(unet_config_default: UNetConfig, device: str) -> None:
 
 
 def test_unet_2d(unet_config_default: UNetConfig, device: str) -> None:
-    """Test the unet model with dim=2.
-
-    Args:
-        unet_config_default : The configuration to use for testing.
-        device : The device to use for testing.
-    """
     # create model
     model = UNet(unet_config_default)
 
@@ -90,12 +68,6 @@ def test_unet_2d(unet_config_default: UNetConfig, device: str) -> None:
 
 
 def test_unet_3d(unet_config_default: UNetConfig, device: str) -> None:
-    """Test the unet model with dim=3.
-
-    Args:
-        unet_config_default : The configuration to use for testing.
-        device : The device to use for testing.
-    """
     # change the default configuration
     unet_config_default.dim = 3
     # create model
@@ -113,11 +85,6 @@ def test_unet_3d(unet_config_default: UNetConfig, device: str) -> None:
 
 
 def test_unet_invalid_dimension(unet_config_default: UNetConfig) -> None:
-    """Test the unet model with dim=4.
-
-    Args:
-        unet_config_default : The configuration to use for testing.
-    """
     # change the default configuration
     unet_config_default.dim = 4
     # create model
@@ -126,12 +93,6 @@ def test_unet_invalid_dimension(unet_config_default: UNetConfig) -> None:
 
 
 def test_unet_res_net(unet_config_default: UNetConfig, device: str) -> None:
-    """Test the Unet1D model.
-
-    Args:
-        unet_config_default : The configuration to use for testing.
-        device : The device to use for testing.
-    """
     # change the default configuration
     unet_config_default.dim = 2
     unet_config_default.encoder_backbone = UNetBackbones.ResNet
@@ -152,11 +113,6 @@ def test_unet_res_net(unet_config_default: UNetConfig, device: str) -> None:
 
 
 def test_unet_invalid_backbone(unet_config_default: UNetConfig) -> None:
-    """Test the UNet model with invalid backbone.
-
-    Args:
-        unet_config_default : The configuration to use for testing.
-    """
     # change the default configuration
     unet_config_default.encoder_backbone = "InvalidBackbone"
     # create model
@@ -165,11 +121,6 @@ def test_unet_invalid_backbone(unet_config_default: UNetConfig) -> None:
 
 
 def test_bilinear_decoder(unet_config_default: UNetConfig) -> None:
-    """Test the Unet1D model.
-
-    Args:
-        unet_config_default : The configuration to use for testing.
-    """
     # change the default configuration
     unet_config_default.bilinear_upsampling = True
     # create model
@@ -178,12 +129,6 @@ def test_bilinear_decoder(unet_config_default: UNetConfig) -> None:
 
 
 def test_unet_save_load(unet_config_default: UNetConfig) -> None:
-    """Test the unet model with dim=2.
-
-    Args:
-        unet_config_default : The configuration to use for testing.
-        device : The device to use for testing.
-    """
     with TemporaryDirectory() as tmpdir:
         tmpdir = Path(tmpdir)
         # create model
