@@ -7,6 +7,7 @@ ignore = """
     ANN002 # Missing type annotation for args in method
     ANN003 # Missing type annotation for kwargs in method
     ANN101 # Missing type annotation for self in method
+    ANN102 # Missing type annotation for cls in method
     D403 # First word of the first line should be properly capitalized
     D415 # First line should end with a period, question mark, or exclamation point
     E741 # Ambiguous variable name
