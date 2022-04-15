@@ -188,16 +188,14 @@ def test_unet_save_load(unet_config_default: UNetConfig) -> None:
         tmpdir = Path(tmpdir)
         # create model
         model_pre_save = UNet(unet_config_default)
-        model_pre_save.save(tmpdir)
+        unet_config_default.save(tmpdir / "unet_config.json")
+        model_pre_save.save(tmpdir / "unet_model.pt")
 
-        assert (tmpdir / "state_dict.pt").exists()
-        assert (tmpdir / "config.json").exists()
+        assert (tmpdir / "unet_config.json").exists()
+        assert (tmpdir / "unet_model.pt").exists()
 
         # load model
-        model_post_load = UNet.from_pretrained(tmpdir)
+        config_post_load = UNetConfig.from_file(tmpdir / "unet_config.json")
+        model_post_load = UNet.from_pretrained(tmpdir / "unet_model.pt", config_post_load)
 
-        assert model_post_load.config.__dict__ == model_pre_save.config.__dict__
-
-        # directory does not exist
-        with pytest.raises(FileNotFoundError):
-            UNet.from_pretrained(tmpdir / "does_not_exist")
+        assert model_post_load.config.__dict__ == unet_config_default.__dict__

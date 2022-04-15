@@ -1,6 +1,5 @@
 """U-Net implementation."""
 from dataclasses import dataclass
-from pathlib import Path
 from typing import List, Type, Union
 
 import torch
@@ -333,35 +332,24 @@ class UNet(nn.Module):
         x = self.decoder(x, hidden_states)
         return x
 
-    def save(self, dir_path: Union[Path, str]) -> None:
+    def save(self, path: str) -> None:
         """Save the model.
 
         Args:
-            dir_path : Path to save the model to.
+            path : Path to save the model to.
         """
-        dir_path = Path(dir_path)
-        dir_path.mkdir(parents=True, exist_ok=True)
-
-        # save configuration
-        self.config.save(dir_path / "config.json")
         # save parameters
-        torch.save(self.state_dict(), dir_path / "state_dict.pt")
+        torch.save(self.state_dict(), path)
 
     @classmethod
-    def from_pretrained(cls, dir_path: Union[Path, str]) -> "UNet":
-        """Save the model.
+    def from_pretrained(cls, path: str, config: UNetConfig) -> "UNet":
+        """Load a pretrained model.
 
         Args:
-            dir_path : Path to save the model to.
+            path : Path to load the model from.
+            config : Configuration for the U-Net.
         """
-        dir_path = Path(dir_path)
-        if not dir_path.exists() or not dir_path.is_dir():
-            raise FileNotFoundError(f"Directory {dir_path} does not exist.")
-
-        # load configuration
-        config = UNetConfig.from_file(dir_path / "config.json")
         # load parameters
         model = cls(config)
-        model.load_state_dict(torch.load(dir_path / "state_dict.pt"))
-
+        model.load_state_dict(torch.load(path))
         return model

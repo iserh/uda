@@ -1,8 +1,7 @@
 """U-Net configuration."""
 import json
 from enum import Enum
-from pathlib import Path
-from typing import List, Union
+from typing import List
 
 
 class UNetBackbones(str, Enum):
@@ -47,29 +46,25 @@ class UNetConfig:
         self.batch_norm_after_encoder = batch_norm_after_encoder
         self.bilinear_upsampling = bilinear_upsampling
 
-    def save(self, file_path: Union[Path, str]) -> None:
+    def save(self, path: str) -> None:
         """Save the model.
 
         Args:
-            file_path : Path to save the config to.
+            path : Path to save the config to.
         """
-        file_path = Path(file_path)
-
         # save configuration
-        with open(file_path, "w") as f:
+        with open(path, "w") as f:
             json.dump(self.__dict__, f, indent=4)
 
     @classmethod
-    def from_file(cls, file_path: Union[Path, str]) -> "UNetConfig":
+    def from_file(cls, path: str) -> "UNetConfig":
         """Save the model.
 
         Args:
-            file_path : Path to load the config from.
+            path : Path to load the config from.
         """
-        file_path = Path(file_path)
-
         # load configuration
-        with open(file_path, "r") as f:
+        with open(path, "r") as f:
             config = cls(**json.load(f))
 
         return config
