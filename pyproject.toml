@@ -6,8 +6,8 @@ authors = ["Henri Iser <iserh.ml@gmail.com>"]
 
 [tool.poetry.dependencies]
 python = ">=3.9,<3.11"
-apeer-ometiff-library = "^1.8.2"
 gdown = "^4.4.0"
+imageio = "^2.16.2"
 jupyter = "^1.0.0"
 matplotlib = "^3.5.1"
 nibabel = "^3.2.2"
