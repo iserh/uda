@@ -27,8 +27,13 @@ print(train_dataset.label.shape)
 print(train_dataset.voxel_dim.shape)
 
 # Create dataloaders
+<<<<<<< HEAD:scripts/CC_ss_unet2d.py
 train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=24, shuffle=True)
 test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=24, shuffle=False)
+=======
+train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=12, shuffle=True)
+test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=12, shuffle=False)
+>>>>>>> 84a8a630cd437faae216e35796da1dda20b33969:scripts/train_unet2d_calgary_campinas.py
 
 # We use one encoder block less than the original U-Net, since our input is of shape (256, 256)
 config = UNetConfig(
