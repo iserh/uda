@@ -18,19 +18,21 @@ class NNModules:
             self.ConvNd = nn.Conv1d
             self.ConvTransposeNd = nn.ConvTranspose1d
             self.BatchNormNd = nn.BatchNorm1d
-            self.max_poolNd = F.max_pool1d
+            self.MaxPoolNd = nn.MaxPool1d
         elif dim == 2:
             self.ConvNd = nn.Conv2d
             self.ConvTransposeNd = nn.ConvTranspose2d
             self.BatchNormNd = nn.BatchNorm2d
-            self.max_poolNd = F.max_pool2d
+            self.MaxPoolNd = nn.MaxPool2d
         elif dim == 3:
             self.ConvNd = nn.Conv3d
             self.ConvTransposeNd = nn.ConvTranspose3d
             self.BatchNormNd = nn.BatchNorm3d
-            self.max_poolNd = F.max_pool3d
+            self.MaxPoolNd = nn.MaxPool3d
         else:
             raise ValueError(f"Invalid dimensionality: {dim}")
+
+        self.bias = False
 
 
 class StackedConvBlock(nn.Module):
@@ -46,22 +48,20 @@ class StackedConvBlock(nn.Module):
 
         self.convs = nn.ModuleList()
         for in_channels, out_channels in zip(hidden_sizes[:-1], hidden_sizes[1:]):
-            conv = nn.Sequential(
-                nn_.ConvNd(
-                    in_channels=in_channels,
-                    out_channels=out_channels,
-                    kernel_size=3,
-                    stride=1,
-                    padding=1,
-                    bias=False,
-                ),
-                nn.ReLU(),
+            conv = nn_.ConvNd(
+                in_channels=in_channels,
+                out_channels=out_channels,
+                kernel_size=3,
+                stride=1,
+                padding=1,
+                bias=nn_.bias,
             )
             self.convs.append(conv)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         for conv in self.convs:
-            x = conv(x)
+            x = F.relu(conv(x))
+
         return x
 
 
@@ -82,7 +82,7 @@ class ResBlock(nn.Module):
             kernel_size=3,
             stride=1,
             padding=1,
-            bias=False,
+            bias=nn_.bias,
         )
         self.bn1 = nn_.BatchNormNd(hidden_sizes[1])
         self.conv2 = nn_.ConvNd(
@@ -91,7 +91,7 @@ class ResBlock(nn.Module):
             kernel_size=3,
             stride=1,
             padding=1,
-            bias=False,
+            bias=nn_.bias,
         )
         self.bn2 = nn_.BatchNormNd(hidden_sizes[2])
         if hidden_sizes[0] != hidden_sizes[-1]:
@@ -101,7 +101,7 @@ class ResBlock(nn.Module):
                 kernel_size=1,
                 stride=1,
                 padding=0,
-                bias=False,
+                bias=nn_.bias,
             )
             self.bn_shortcut = nn_.BatchNormNd(hidden_sizes[-1])
         else:
@@ -164,10 +164,7 @@ class UNetEncoder(nn.Module):
         # encoder blocks
         Backbone = _get_backbone_class(config.encoder_backbone)
         self.blocks = nn.ModuleList([Backbone(channels, config.dim) for channels in config.encoder_blocks])
-
-        # batch norm after last encoder block
-        self.batch_norm = nn_.BatchNormNd(config.encoder_blocks[-1][-1]) if config.batch_norm_after_encoder else None
-        self.max_poolNd = nn_.max_poolNd
+        self.max_pool = nn_.MaxPoolNd(kernel_size=2, stride=2)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         # apply initial encoder block
@@ -176,13 +173,8 @@ class UNetEncoder(nn.Module):
         hidden_states = []  # save hidden states for use in decoder
         for block in self.blocks[1:]:
             hidden_states.append(x)
-            # max pooling downsampling
-            x = self.max_poolNd(x, kernel_size=2, stride=2)
+            x = self.max_pool(x)
             x = block(x)
-
-        # batch norm after last encoder block
-        if self.batch_norm is not None:
-            x = self.batch_norm(x)
 
         return x, hidden_states
 
@@ -209,7 +201,7 @@ class UNetDecoder(nn.Module):
                         out_channels=channels[0] // 2,
                         kernel_size=2,
                         stride=2,
-                        bias=False,
+                        bias=nn_.bias,
                     )
                     for channels in config.decoder_blocks
                 ]
@@ -222,7 +214,7 @@ class UNetDecoder(nn.Module):
             kernel_size=1,
             stride=1,
             padding=0,
-            bias=False,
+            bias=nn_.bias,
         )
 
     def forward(self, x: torch.Tensor, hidden_states: List[torch.Tensor]) -> torch.Tensor:
@@ -232,7 +224,7 @@ class UNetDecoder(nn.Module):
             x = block(x)
         # map to classes
         x = self.mapping_conv(x)
-        return x
+        return x.sigmoid()
 
 
 class UNet(nn.Module):
@@ -244,10 +236,17 @@ class UNet(nn.Module):
         self.encoder = UNetEncoder(config)
         self.decoder = UNetDecoder(config)
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        # initialize weights !!
+        init_weights = WeightInitializer(dim=config.dim)
+        self.encoder.apply(init_weights)
+        self.decoder.apply(init_weights)
+        # use xavier initialization mapping convolution because of sigmoid activation
+        self.decoder.mapping_conv.apply(lambda m: nn.init.xavier_uniform_(m.weight))
+
+    def forward(self, x: torch.Tensor, ret_hidden_states: bool = False) -> torch.Tensor:
         x, hidden_states = self.encoder(x)
         x = self.decoder(x, hidden_states)
-        return x
+        return x if not ret_hidden_states else (x, hidden_states)
 
     def save(self, path: str) -> None:
         torch.save(self.state_dict(), path)
@@ -257,3 +256,20 @@ class UNet(nn.Module):
         model = cls(config)
         model.load_state_dict(torch.load(path))
         return model
+
+
+class WeightInitializer:
+    def __init__(self, dim: int) -> None:
+        self.nn_ = NNModules(dim=dim)
+
+    def init_weights(self, m: nn.Module) -> None:
+        if isinstance(m, self.nn_.ConvNd) or isinstance(m, self.nn_.ConvTransposeNd):
+            nn.init.kaiming_normal_(m.weight, mode="fan_out", nonlinearity="relu")
+            if m.bias is not None:
+                nn.init.constant_(m.bias, 0)
+        elif isinstance(m, self.nn_.BatchNormNd):
+            nn.init.constant_(m.weight, 1)
+            nn.init.constant_(m.bias, 0)
+
+    def __call__(self, m: nn.Module) -> None:
+        self.init_weights(m)
