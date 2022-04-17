@@ -63,7 +63,7 @@ model = model.to(device)
 optim = torch.optim.Adam(model.parameters(), lr=1e-4)
 
 TEST_INTERVAL = 100
-MAX_STEPS = 1_000
+MAX_STEPS = 1_500
 
 train_losses, test_losses = [], []
 train_dscs, test_dscs = [], []

@@ -34,6 +34,8 @@ print(train_dataset.voxel_dim.shape)
 train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=16, shuffle=True)
 test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=16, shuffle=False)
 
+# This configuration is similar to the preprint, but it uses smaller u-net blocks
+# to compensate for CPU limitations
 config = UNetConfig(
     n_classes=1,
     dim=3,
@@ -71,7 +73,7 @@ model = UNet(config).to(device)
 optim = torch.optim.Adam(model.parameters(), lr=1e-4)
 
 TEST_INTERVAL = 100
-MAX_STEPS = 5_000
+MAX_STEPS = 1_500
 
 train_losses, test_losses = [], []
 train_dscs, test_dscs = [], []
