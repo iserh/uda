@@ -2,7 +2,7 @@
 name = "uda"
 version = "0.1.0"
 description = "Unsupervised Domain Adaptation"
-authors = ["Henri Iser <iserh.ml@gmail.com>"]
+authors = ["Henri Iser <iserhenri@gmail.com>"]
 
 [tool.poetry.dependencies]
 python = ">=3.9,<3.11"
