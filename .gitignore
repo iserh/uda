@@ -5,6 +5,7 @@
 .pytest_cache
 .vscode
 htmlcov
+data
 
 # files
 .coverage
