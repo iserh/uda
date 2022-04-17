@@ -15,7 +15,7 @@ from tqdm import tqdm
 class CalgaryCampinasDataset(Dataset):
     """Dataset class for loading Calgary Campinas dataset."""
 
-    PADDING_SHAPE = (200, 256, 256)
+    PADDING_SHAPE = (192, 256, 256)
 
     def __init__(
         self,
@@ -26,6 +26,7 @@ class CalgaryCampinasDataset(Dataset):
         rotate: bool = True,
         flatten: bool = False,
         patchify: Optional[Tuple[int]] = None,
+        squash_patches: bool = True,
         random_state: int = 42,
     ) -> None:
         """Args:
@@ -36,6 +37,7 @@ class CalgaryCampinasDataset(Dataset):
         `rotate` : Rotate the images
         `flatten` : Flatten the Z dimension
         `patchify` : Patchify the images
+        `squash_patches` : Squash the patches
         `random_state` : Random state for cross-validation
         """
         self.vendor = vendor
@@ -44,6 +46,7 @@ class CalgaryCampinasDataset(Dataset):
         self.rotate = rotate
         self.flatten = flatten
         self.patchify = patchify
+        self.squash_patches = squash_patches
         self.random_state = random_state
         self.load_files(data_path)
 
@@ -60,9 +63,17 @@ class CalgaryCampinasDataset(Dataset):
     def pad_array(self, arr: np.ndarray, mode: str = "edge") -> np.ndarray:
         depth, width, height = self.PADDING_SHAPE
 
-        # crop image if too large
-        if arr.shape[0] > depth or arr.shape[1] > width or arr.shape[2] > height:
-            arr = arr[:depth, :width, :height]
+        # center crop image if too large
+        if arr.shape[0] > depth:
+            z = (int(np.floor((arr.shape[0] - depth) / 2)), int(np.ceil((arr.shape[0] - depth) / 2)))
+            arr = arr[z[0] : -z[1]]
+        elif arr.shape[1] > width:
+            x = (int(np.floor((arr.shape[1] - width) / 2)), int(np.ceil((arr.shape[1] - width) / 2)))
+            arr = arr[:, x[0] : -x[1]]
+        elif arr.shape[2] > height:
+            y = (int(np.floor((arr.shape[2] - height) / 2)), int(np.ceil((arr.shape[2] - height) / 2)))
+            arr = arr[:, :, y[0] : -y[1]]
+
         # pad image
         if arr.shape[0] < depth or arr.shape[1] < width or arr.shape[2] < height:
             arr = np.pad(
@@ -124,15 +135,27 @@ class CalgaryCampinasDataset(Dataset):
             label = label.reshape(-1, *label.shape[-2:])
             voxel_dim = voxel_dim.reshape(-1, voxel_dim.shape[-1])
 
+        # add channel dimension
+        data = data.unsqueeze(1)
+        label = label.unsqueeze(1)
+        voxel_dim = voxel_dim.unsqueeze(1)
+
         # patchify the data
         if self.patchify is not None:
-            data = patchify(data, self.patchify, start=1).reshape(data.shape[0], -1, *self.patchify)
-            label = patchify(label, self.patchify, start=1).reshape(label.shape[0], -1, *self.patchify)
+            data = patchify(data, self.patchify)
+            label = patchify(label, self.patchify)
+            self.n_patches = data.shape[2 : 2 + len(self.patchify)]
 
-        # insert channel dimension
-        self.data = data.unsqueeze(2 if self.patchify is not None else 1)
-        self.label = label.unsqueeze(2 if self.patchify is not None else 1)
-        self.voxel_dim = voxel_dim.unsqueeze(2 if self.patchify is not None else 1)
+            if self.squash_patches:
+                data = data.reshape(-1, 1, *self.patchify)
+                label = label.reshape(-1, 1, *self.patchify)
+            else:
+                data = data.reshape(data.shape[0], -1, 1, *self.patchify)
+                label = label.reshape(label.shape[0], -1, 1, *self.patchify)
+
+        self.data = data
+        self.label = label
+        self.voxel_dim = voxel_dim
 
     def __len__(self) -> int:
         return len(self.data)
@@ -140,9 +163,8 @@ class CalgaryCampinasDataset(Dataset):
     def __getitem__(self, idx: int) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         data = self.data[idx]
         labels = self.label[idx]
-        voxel_dim = self.voxel_dim[idx]
 
-        return data, labels, voxel_dim
+        return data, labels
 
 
 def patchify(t: torch.Tensor, size: Tuple[int], start: int = 2) -> torch.Tensor:
@@ -153,11 +175,11 @@ def patchify(t: torch.Tensor, size: Tuple[int], start: int = 2) -> torch.Tensor:
     """
     # offset is needed because in each iteration one axis gets added
     for offset, (i, dim_size) in enumerate(enumerate(size, start=start)):
-        t = torch.stack(torch.split(t, dim_size, dim=i + offset), dim=i)
+        t = torch.stack(t.split(dim_size, dim=i + offset), dim=i)
     return t
 
 
-def unpatchify(t: torch.Tensor, size: Tuple[int], start: int = 2, patch_dim: int = 1) -> torch.Tensor:
+def unpatchify(t: torch.Tensor, size: Tuple[int], start: int = 3, patch_dim: int = 1) -> torch.Tensor:
     """Args:
     `t` : Tensor to unpatchify
     `size` : Unpatchified size

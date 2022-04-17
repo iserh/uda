@@ -10,6 +10,7 @@ ignore = """
     ANN102 # Missing type annotation for cls in method
     D403 # First word of the first line should be properly capitalized
     D415 # First line should end with a period, question mark, or exclamation point
+    E203 # whitespace before ':'
     E741 # Ambiguous variable name
     S301 # Pickle and modules that wrap it can be unsafe when used to deserialize untrusted data, possible security issue.
     """

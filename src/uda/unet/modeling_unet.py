@@ -216,10 +216,14 @@ class UNetDecoder(nn.Module):
             padding=0,
             bias=nn_.bias,
         )
+        # cropping
+        self.cropping = CropNd(dim=config.dim)
 
     def forward(self, x: torch.Tensor, hidden_states: List[torch.Tensor]) -> torch.Tensor:
         for block, up_conv, hidden_state in zip(self.blocks, self.up_convs, reversed(hidden_states)):
             x = up_conv(x)
+            # crop and concatenate
+            # hidden_state = self.cropping(hidden_state, x.size())
             x = torch.cat([x, hidden_state], dim=1)
             x = block(x)
         # map to classes
@@ -273,3 +277,40 @@ class WeightInitializer:
 
     def __call__(self, m: nn.Module) -> None:
         self.init_weights(m)
+
+
+class CropNd(nn.Module):
+    def __init__(self, dim: int) -> None:
+        super().__init__()
+        if dim == 1:
+            self.crop = crop1d
+        elif dim == 2:
+            self.crop = crop2d
+        elif dim == 3:
+            self.crop = crop3d
+        else:
+            raise ValueError(f"Invalid dimensionality: {dim}")
+
+    def forward(self, x: torch.Tensor, shape: torch.Size) -> torch.Tensor:
+        return self.crop(x, shape)
+
+
+def crop1d(x: torch.Tensor, shape: torch.Size) -> torch.Tensor:
+    if x.shape == shape:
+        return x
+    else:
+        return x[..., : shape[-1]]
+
+
+def crop2d(x: torch.Tensor, shape: torch.Size) -> torch.Tensor:
+    if x.shape == shape:
+        return x
+    else:
+        return x[..., : shape[-2], : shape[-1]]
+
+
+def crop3d(x: torch.Tensor, shape: torch.Size) -> torch.Tensor:
+    if x.shape == shape:
+        return x
+    else:
+        return x[..., : shape[-3], : shape[-2], : shape[-1]]
