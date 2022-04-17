@@ -15,7 +15,7 @@ from tqdm import tqdm
 class CalgaryCampinasDataset(Dataset):
     """Dataset class for loading Calgary Campinas dataset."""
 
-    D, W, H = 200, 256, 256
+    PADDING_SHAPE = (200, 256, 256)
 
     def __init__(
         self,
@@ -25,6 +25,7 @@ class CalgaryCampinasDataset(Dataset):
         train: bool = True,
         rotate: bool = True,
         flatten: bool = False,
+        patchify: Optional[Tuple[int]] = None,
         random_state: int = 42,
     ) -> None:
         """Args:
@@ -34,6 +35,7 @@ class CalgaryCampinasDataset(Dataset):
         `train` : Whether to load training or test partition (only when fold is not None)
         `rotate` : Rotate the images
         `flatten` : Flatten the Z dimension
+        `patchify` : Patchify the images
         `random_state` : Random state for cross-validation
         """
         self.vendor = vendor
@@ -41,6 +43,7 @@ class CalgaryCampinasDataset(Dataset):
         self.train = train
         self.rotate = rotate
         self.flatten = flatten
+        self.patchify = patchify
         self.random_state = random_state
         self.load_files(data_path)
 
@@ -54,33 +57,19 @@ class CalgaryCampinasDataset(Dataset):
 
         return files[indices].tolist()
 
-    def pad_images(self, images: List[np.ndarray], mode: str = "edge") -> List[np.ndarray]:
-        padded_images = []
-        for x in images:
-            # crop image
-            if x.shape[0] > self.D or x.shape[1] > self.W or x.shape[2] > self.H:
-                x = x[: self.D, : self.W, : self.H]
-            # pad image
-            if x.shape[0] < self.D or x.shape[1] < self.W or x.shape[2] < self.H:
-                x = np.pad(x, ((0, self.D - x.shape[0]), (0, self.W - x.shape[1]), (0, self.H - x.shape[2])), mode=mode)
+    def pad_array(self, arr: np.ndarray, mode: str = "edge") -> np.ndarray:
+        depth, width, height = self.PADDING_SHAPE
 
-            padded_images.append(x)
+        # crop image if too large
+        if arr.shape[0] > depth or arr.shape[1] > width or arr.shape[2] > height:
+            arr = arr[:depth, :width, :height]
+        # pad image
+        if arr.shape[0] < depth or arr.shape[1] < width or arr.shape[2] < height:
+            arr = np.pad(
+                arr, ((0, depth - arr.shape[0]), (0, width - arr.shape[1]), (0, height - arr.shape[2])), mode=mode
+            )
 
-        return padded_images
-
-    def pad_voxel_dims(self, voxel_dims: List[np.ndarray], mode: str = "constant") -> List[np.ndarray]:
-        padded_voxel_dims = []
-        for v in voxel_dims:
-            # crop array
-            if v.shape[0] > self.D:
-                v = v[: self.D]
-            # pad array
-            if v.shape[0] < self.D:
-                v = np.pad(v, ((0, self.D - v.shape[0]), (0, 0)), mode=mode)
-
-            padded_voxel_dims.append(v)
-
-        return padded_voxel_dims
+        return arr
 
     def load_files(self, data_path: str) -> None:
         data_path = Path(data_path)
@@ -108,25 +97,42 @@ class CalgaryCampinasDataset(Dataset):
                 img = np.rot90(img, k=-1, axes=(1, 2))
                 label = np.rot90(label, k=-1, axes=(1, 2))
 
-            spacing = np.array([nib_img.header.get_zooms()] * img.shape[0])
+            # pad the images
+            img = self.pad_array(img)
+            label = self.pad_array(label)
+
+            voxel_dim = np.array([nib_img.header.get_zooms()] * img.shape[0])
+            # padding for voxel dim
+            if voxel_dim.shape[0] > self.PADDING_SHAPE[0]:
+                voxel_dim = voxel_dim[: self.PADDING_SHAPE[0]]
+            if voxel_dim.shape[0] < self.PADDING_SHAPE[0]:
+                voxel_dim = np.pad(
+                    voxel_dim, ((0, self.PADDING_SHAPE[0] - voxel_dim.shape[0]), (0, 0)), mode="constant"
+                )
 
             images.append(img)
             labels.append(label)
-            voxel_dims.append(spacing)
+            voxel_dims.append(voxel_dim)
 
-        images = np.stack(self.pad_images(images))
-        labels = np.stack(self.pad_images(labels))
-        voxel_dims = np.stack(self.pad_voxel_dims(voxel_dims))
+        # stack and convert to torch tensors
+        data = torch.from_numpy(np.stack(images))
+        label = torch.from_numpy(np.stack(labels))
+        voxel_dim = torch.from_numpy(np.stack(voxel_dims))
 
         if self.flatten:
-            images = images.reshape(-1, *images.shape[-2:])
-            labels = labels.reshape(-1, *labels.shape[-2:])
-            voxel_dims = voxel_dims.reshape(-1, voxel_dims.shape[-1])
+            data = data.reshape(-1, *data.shape[-2:])
+            label = label.reshape(-1, *label.shape[-2:])
+            voxel_dim = voxel_dim.reshape(-1, voxel_dim.shape[-1])
+
+        # patchify the data
+        if self.patchify is not None:
+            data = patchify(data, self.patchify, start=1).reshape(data.shape[0], -1, *self.patchify)
+            label = patchify(label, self.patchify, start=1).reshape(label.shape[0], -1, *self.patchify)
 
         # insert channel dimension
-        self.data = torch.from_numpy(images).unsqueeze(1)
-        self.label = torch.from_numpy(labels).unsqueeze(1)
-        self.voxel_dim = torch.from_numpy(voxel_dims).unsqueeze(1)
+        self.data = data.unsqueeze(2 if self.patchify is not None else 1)
+        self.label = label.unsqueeze(2 if self.patchify is not None else 1)
+        self.voxel_dim = voxel_dim.unsqueeze(2 if self.patchify is not None else 1)
 
     def __len__(self) -> int:
         return len(self.data)
@@ -137,6 +143,38 @@ class CalgaryCampinasDataset(Dataset):
         voxel_dim = self.voxel_dim[idx]
 
         return data, labels, voxel_dim
+
+
+def patchify(t: torch.Tensor, size: Tuple[int], start: int = 2) -> torch.Tensor:
+    """Args:
+    `t` : Tensor to patchify
+    `size` : Patch size
+    `start` : Starting index of the dimensions to patchify
+    """
+    # offset is needed because in each iteration one axis gets added
+    for offset, (i, dim_size) in enumerate(enumerate(size, start=start)):
+        t = torch.stack(torch.split(t, dim_size, dim=i + offset), dim=i)
+    return t
+
+
+def unpatchify(t: torch.Tensor, size: Tuple[int], start: int = 2, patch_dim: int = 1) -> torch.Tensor:
+    """Args:
+    `t` : Tensor to unpatchify
+    `size` : Unpatchified size
+    `start` : Starting index of the dimensions to unpatchify
+    `patch_dim` : Dimension of the patch
+    """
+    # compute number of patches for each patch dimension
+    n_patches = [patch_size // t_size for patch_size, t_size in zip(size, t.shape[start:])]
+    # reshape tensor with unfolded patches
+    t = t.reshape(*t.shape[:patch_dim], *n_patches, *t.shape[start:])
+    # reset start dimension (unfolding added dimensions in front)
+    patch_dim_end = patch_dim + len(size) - 1
+    # concatenate patches
+    for i in range(len(size)):
+        t = torch.cat(t.split(1, patch_dim_end - i), dim=-i - 1)
+    # squash patch dimensions
+    return t.reshape(*t.shape[:patch_dim], *size)
 
 
 if __name__ == "__main__":
