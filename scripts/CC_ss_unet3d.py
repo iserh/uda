@@ -111,6 +111,29 @@ with tqdm(total=MAX_STEPS, desc="Training") as pbar:
                     test_losses.append(F.binary_cross_entropy(preds, targets).item())
                     test_dscs.append(dice_score(pred_mask, targets).item())
 
+                _, ax = plt.subplots(1, 2, figsize=(10, 4))
+
+                sns.lineplot(
+                    x=range(len(train_losses)), y=train_losses, label=f"train ({train_losses[-1]:.4f})", ax=ax[0]
+                )
+                sns.lineplot(
+                    x=range(TEST_INTERVAL, len(train_losses) + 1, TEST_INTERVAL),
+                    y=test_losses,
+                    label=f"test ({test_losses[-1]:.4f})",
+                    ax=ax[0],
+                )
+
+                sns.lineplot(x=range(len(train_dscs)), y=train_dscs, label=f"train ({train_dscs[-1]:.4f})", ax=ax[1])
+                sns.lineplot(
+                    x=range(TEST_INTERVAL, len(train_dscs) + 1, TEST_INTERVAL),
+                    y=test_dscs,
+                    label=f"test ({test_dscs[-1]:.4f})",
+                    ax=ax[1],
+                )
+
+                plt.legend()
+                plt.savefig(output_dir / "metrics3d.pdf")
+
             pbar.set_postfix(
                 {
                     "loss": sum(train_losses[-5:]) / 5,
@@ -124,14 +147,24 @@ model.cpu()
 
 _, ax = plt.subplots(1, 2, figsize=(10, 4))
 
-sns.lineplot(x=range(len(train_losses)), y=train_losses, label="train", ax=ax[0])
-sns.lineplot(x=range(TEST_INTERVAL, len(train_losses) + 1, TEST_INTERVAL), y=test_losses, label="test", ax=ax[0])
+sns.lineplot(x=range(len(train_losses)), y=train_losses, label=f"train ({train_losses[-1]:.4f})", ax=ax[0])
+sns.lineplot(
+    x=range(TEST_INTERVAL, len(train_losses) + 1, TEST_INTERVAL),
+    y=test_losses,
+    label=f"test ({test_losses[-1]:.4f})",
+    ax=ax[0],
+)
 
-sns.lineplot(x=range(len(train_dscs)), y=train_dscs, label="train", ax=ax[1])
-sns.lineplot(x=range(TEST_INTERVAL, len(train_dscs) + 1, TEST_INTERVAL), y=test_dscs, label="test", ax=ax[1])
+sns.lineplot(x=range(len(train_dscs)), y=train_dscs, label=f"train ({train_dscs[-1]:.4f})", ax=ax[1])
+sns.lineplot(
+    x=range(TEST_INTERVAL, len(train_dscs) + 1, TEST_INTERVAL),
+    y=test_dscs,
+    label=f"test ({test_dscs[-1]:.4f})",
+    ax=ax[1],
+)
 
 plt.legend()
-plt.savefig(output_dir / "metrics.pdf")
+plt.savefig(output_dir / "metrics3d.pdf")
 
 config.save(output_dir / "unet3d_config.json")
 model.save(output_dir / "unet3d_model.pt")
