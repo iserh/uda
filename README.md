@@ -5,8 +5,16 @@ Using pip (via pyproject.toml):
 pip install .
 ```
 
-Using poetry:
+## For Development
+For convenience we use justfiles (see https://github.com/casey/just)
 ```sh
-poetry install
+just install
 ```
 
+Setup datasets:
+```sh
+just setup-cc359
+```
+```sh
+just download-mms
+```

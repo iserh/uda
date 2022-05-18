@@ -9,8 +9,8 @@ from tqdm import tqdm
 from uda import UNet, UNetConfig
 from uda.calgary_campinas_dataset import CalgaryCampinasDataset
 
-data_dir = Path("/home/iailab36/iser/uda-data")
-output_dir = Path("/home/iailab36/iser/uda-data/output")
+data_dir = Path("/tmp/data/CC359")
+output_dir = Path("/tmp/data/output")
 output_dir.mkdir(exist_ok=True, parents=True)
 
 sns.set_theme(style="darkgrid")
