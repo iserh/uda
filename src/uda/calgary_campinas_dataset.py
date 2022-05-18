@@ -101,7 +101,8 @@ class CalgaryCampinasDataset(Dataset):
             nib_label: SpatialImage = nib.load(label_path)
             label = nib_label.get_fdata("unchanged", dtype=np.float32)
 
-            # scale the images
+            # clip & scale the images
+            img = img.clip(min=-200, max=400)
             img = scaler.fit_transform(img.reshape(-1, 1)).reshape(img.shape)
 
             if self.rotate:
