@@ -3,11 +3,11 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import seaborn as sns
 import torch
-import torch.nn.functional as F
 from tqdm import tqdm
 
 from uda import UNet, UNetConfig
 from uda.calgary_campinas_dataset import CalgaryCampinasDataset
+from uda.losses import dice_loss
 from uda.metrics import dice_score
 
 data_dir = Path("/tmp/data/CC359")
@@ -64,6 +64,7 @@ print(f"# parameters: {n_params:,}")
 
 model = UNet(config).to(device)
 optim = torch.optim.Adam(model.parameters(), lr=1e-4)
+criterion = dice_loss
 
 TEST_INTERVAL = 100
 MAX_STEPS = 1_500
@@ -86,7 +87,7 @@ with tqdm(total=MAX_STEPS, desc="Training") as pbar:
             optim.zero_grad()
             y_pred = model(x)
 
-            loss = F.binary_cross_entropy(y_pred, y_true)
+            loss = criterion(y_pred, y_true)
 
             loss.backward()
             optim.step()
@@ -100,7 +101,7 @@ with tqdm(total=MAX_STEPS, desc="Training") as pbar:
                     preds = torch.cat(preds)
                     targets = torch.cat(targets)
 
-                    test_losses.append(F.binary_cross_entropy(preds, targets).item())
+                    test_losses.append(criterion(preds, targets).item())
                     test_dscs.append(dice_score(preds.round(), targets).item())
 
                 _, ax = plt.subplots(1, 2, figsize=(10, 4))
