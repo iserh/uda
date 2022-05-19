@@ -1,8 +1,9 @@
 from pathlib import Path
+from tempfile import TemporaryDirectory
 
-import matplotlib.pyplot as plt
-import seaborn as sns
+import mlflow
 import torch
+from mlflow import log_artifact, log_metrics, log_params
 from tqdm import tqdm
 
 from uda import UNet, UNetConfig
@@ -11,13 +12,13 @@ from uda.losses import dice_loss
 from uda.metrics import dice_score
 
 data_dir = Path("/tmp/data/CC359")
-output_dir = Path("/tmp/data/output")
-output_dir.mkdir(exist_ok=True, parents=True)
-
-sns.set_theme(style="darkgrid")
+mlflow.set_tracking_uri("http://localhost:5000")
+if (experiment := mlflow.get_experiment_by_name("U-Net Training")) is None:
+    experiment_id = mlflow.create_experiment(name="U-Net Training")
+else:
+    experiment_id = experiment.experiment_id
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-# device = "cpu"
 print(f"Using device: {device}")
 
 train_dataset = CalgaryCampinasDataset(
@@ -62,102 +63,76 @@ model = UNet(config)
 n_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
 print(f"# parameters: {n_params:,}")
 
-model = UNet(config).to(device)
+model = model.to(device)
 optim = torch.optim.Adam(model.parameters(), lr=1e-4)
 criterion = dice_loss
 
-TEST_INTERVAL = 100
-MAX_STEPS = 1_500
+MAX_EPOCHS = 1
+TEST_INTERVAL = 20
 
 train_losses, test_losses = [], []
 train_dscs, test_dscs = [], []
 
-i = 0
-dsc_test = 0
-with tqdm(total=MAX_STEPS, desc="Training") as pbar:
-    while i < MAX_STEPS:
-        for x, y_true in train_loader:
+with mlflow.start_run(experiment_id=experiment_id, run_name="unet3d"), TemporaryDirectory() as tempdir:
+    tempdir = Path(tempdir)
+    # log params
+    log_params(
+        {
+            "n_params": n_params,
+            "optim": optim.__class__.__name__,
+            "criterion": criterion.__name__,
+        }
+    )
+
+    # log artifacts
+    config.save(tempdir / "unet2d_config.json")
+    log_artifact(tempdir / "unet2d_config.json")
+
+    i = 0
+    for e in range(1, MAX_EPOCHS + 1):
+        for x, y_true in (pbar := tqdm(train_loader, desc=f"Training Epoch {e}/{MAX_EPOCHS}")):
             i += 1
-            if i > MAX_STEPS:
-                break
 
             x = x.to(device)
             y_true = y_true.to(device)
 
             optim.zero_grad()
             y_pred = model(x)
+            train_loss = criterion(y_pred, y_true)
 
-            loss = criterion(y_pred, y_true)
-
-            loss.backward()
+            train_loss.backward()
             optim.step()
 
-            train_losses.append(loss.item())
-            train_dscs.append(dice_score(y_pred.round(), y_true).item())
+            train_dsc = dice_score(y_pred.round(), y_true)
+            log_metrics({"train_loss": train_loss, "train_dsc": train_dsc}, step=i)
 
             if i % TEST_INTERVAL == 0:
+                # Evaluate on test set
                 with torch.no_grad():
-                    preds, targets = [*zip(*[(model(x.to(device)).cpu(), y_true) for x, y_true in test_loader])]
-                    preds = torch.cat(preds)
-                    targets = torch.cat(targets)
+                    preds, targets = [
+                        *zip(
+                            *[
+                                (model(x.to(device)).cpu(), y_true)
+                                for x, y_true in tqdm(test_loader, desc="Testing", leave=False)
+                            ]
+                        )
+                    ]
+                preds = torch.cat(preds)
+                targets = torch.cat(targets)
 
-                    test_losses.append(criterion(preds, targets).item())
-                    test_dscs.append(dice_score(preds.round(), targets).item())
+                test_loss = criterion(preds, targets)
+                test_dsc = dice_score(preds.round(), targets)
 
-                _, ax = plt.subplots(1, 2, figsize=(10, 4))
+                log_metrics({"test_loss": test_loss, "test_dsc": test_dsc}, step=i)
 
-                sns.lineplot(
-                    x=range(len(train_losses)), y=train_losses, label=f"train ({train_losses[-1]:.4f})", ax=ax[0]
-                )
-                sns.lineplot(
-                    x=range(TEST_INTERVAL, len(train_losses) + 1, TEST_INTERVAL),
-                    y=test_losses,
-                    label=f"test ({test_losses[-1]:.4f})",
-                    ax=ax[0],
-                )
+        pbar.set_postfix(
+            {
+                "loss": train_loss,
+                "train_dsc": train_dsc,
+                "test_dsc": test_dsc if "test_dsc" in locals() else 0,
+            }
+        )
 
-                sns.lineplot(x=range(len(train_dscs)), y=train_dscs, label=f"train ({train_dscs[-1]:.4f})", ax=ax[1])
-                sns.lineplot(
-                    x=range(TEST_INTERVAL, len(train_dscs) + 1, TEST_INTERVAL),
-                    y=test_dscs,
-                    label=f"test ({test_dscs[-1]:.4f})",
-                    ax=ax[1],
-                )
-
-                plt.legend()
-                plt.savefig(output_dir / "metrics3d.pdf")
-
-            pbar.set_postfix(
-                {
-                    "loss": sum(train_losses[-5:]) / 5,
-                    "dsc_train": sum(train_dscs[-5:]) / 5,
-                    "dsc_test": test_dscs[-1] if test_dscs != [] else 0,
-                }
-            )
-            pbar.update()
-
-model.cpu()
-
-_, ax = plt.subplots(1, 2, figsize=(10, 4))
-
-sns.lineplot(x=range(len(train_losses)), y=train_losses, label=f"train ({train_losses[-1]:.4f})", ax=ax[0])
-sns.lineplot(
-    x=range(TEST_INTERVAL, len(train_losses) + 1, TEST_INTERVAL),
-    y=test_losses,
-    label=f"test ({test_losses[-1]:.4f})",
-    ax=ax[0],
-)
-
-sns.lineplot(x=range(len(train_dscs)), y=train_dscs, label=f"train ({train_dscs[-1]:.4f})", ax=ax[1])
-sns.lineplot(
-    x=range(TEST_INTERVAL, len(train_dscs) + 1, TEST_INTERVAL),
-    y=test_dscs,
-    label=f"test ({test_dscs[-1]:.4f})",
-    ax=ax[1],
-)
-
-plt.legend()
-plt.savefig(output_dir / "metrics3d.pdf")
-
-config.save(output_dir / "unet3d_config.json")
-model.save(output_dir / "unet3d_model.pt")
+    model.cpu()
+    model.save(tempdir / "unet2d_model.pt")
+    log_artifact(tempdir / "unet2d_model.pt")
