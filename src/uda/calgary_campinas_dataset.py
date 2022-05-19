@@ -26,7 +26,8 @@ class CalgaryCampinasDataset(Dataset):
         rotate: bool = True,
         flatten: bool = False,
         patchify: Optional[Tuple[int]] = None,
-        squash_patches: bool = True,
+        flatten_patches: bool = True,
+        clip_intensities: Optional[Tuple[int]] = None,
         random_state: int = 42,
     ) -> None:
         """Args:
@@ -37,7 +38,7 @@ class CalgaryCampinasDataset(Dataset):
         `rotate` : Rotate the images
         `flatten` : Flatten the Z dimension
         `patchify` : Patchify the images
-        `squash_patches` : Squash the patches
+        `flatten_patches` : Flatten the patches
         `random_state` : Random state for cross-validation
         """
         self.vendor = vendor
@@ -46,7 +47,8 @@ class CalgaryCampinasDataset(Dataset):
         self.rotate = rotate
         self.flatten = flatten
         self.patchify = patchify
-        self.squash_patches = squash_patches
+        self.flatten_patches = flatten_patches
+        self.clip_intensities = clip_intensities
         self.random_state = random_state
         self.load_files(data_path)
 
@@ -102,7 +104,8 @@ class CalgaryCampinasDataset(Dataset):
             label = nib_label.get_fdata("unchanged", dtype=np.float32)
 
             # clip & scale the images
-            img = img.clip(min=-200, max=400)
+            if self.clip_intensities is not None:
+                img = img.clip(min=self.clip_intensities[0], max=self.clip_intensities[1])
             img = scaler.fit_transform(img.reshape(-1, 1)).reshape(img.shape)
 
             if self.rotate:
@@ -113,14 +116,7 @@ class CalgaryCampinasDataset(Dataset):
             img = self.pad_array(img)
             label = self.pad_array(label)
 
-            voxel_dim = np.array([nib_img.header.get_zooms()] * img.shape[0])
-            # padding for voxel dim
-            if voxel_dim.shape[0] > self.PADDING_SHAPE[0]:
-                voxel_dim = voxel_dim[: self.PADDING_SHAPE[0]]
-            if voxel_dim.shape[0] < self.PADDING_SHAPE[0]:
-                voxel_dim = np.pad(
-                    voxel_dim, ((0, self.PADDING_SHAPE[0] - voxel_dim.shape[0]), (0, 0)), mode="constant"
-                )
+            voxel_dim = np.array([nib_img.header.get_zooms()])
 
             images.append(img)
             labels.append(label)
@@ -139,7 +135,6 @@ class CalgaryCampinasDataset(Dataset):
         # add channel dimension
         data = data.unsqueeze(1)
         label = label.unsqueeze(1)
-        voxel_dim = voxel_dim.unsqueeze(1)
 
         # patchify the data
         if self.patchify is not None:
@@ -147,7 +142,7 @@ class CalgaryCampinasDataset(Dataset):
             label = patchify(label, self.patchify)
             self.n_patches = data.shape[2 : 2 + len(self.patchify)]
 
-            if self.squash_patches:
+            if self.flatten_patches:
                 data = data.reshape(-1, 1, *self.patchify)
                 label = label.reshape(-1, 1, *self.patchify)
             else:

@@ -8,6 +8,7 @@ from tqdm import tqdm
 
 from uda import UNet, UNetConfig
 from uda.calgary_campinas_dataset import CalgaryCampinasDataset
+from uda.metrics import dice_score
 
 data_dir = Path("/tmp/data/CC359")
 output_dir = Path("/tmp/data/output")
@@ -27,12 +28,12 @@ print(train_dataset.label.shape)
 print(train_dataset.voxel_dim.shape)
 
 # Create dataloaders
-train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=24, shuffle=True)
-test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=24, shuffle=False)
+train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=16, shuffle=True)
+test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=16, shuffle=False)
 
 # We use one encoder block less than the original U-Net, since our input is of shape (256, 256)
 config = UNetConfig(
-    n_classes=1,
+    out_channels=1,
     encoder_blocks=(
         (1, 64, 64),
         (64, 128, 128),
@@ -50,14 +51,6 @@ model = UNet(config)
 
 n_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
 print(f"# parameters: {n_params:,}")
-
-
-def dice_score(pred: torch.Tensor, target: torch.Tensor) -> float:
-    pred = pred.reshape(-1)
-    target = target.reshape(-1)
-    intersection = (pred * target).sum()
-    return 2 * intersection / (pred.sum() + target.sum())
-
 
 model = model.to(device)
 optim = torch.optim.Adam(model.parameters(), lr=1e-4)
@@ -88,7 +81,7 @@ with tqdm(total=MAX_STEPS, desc="Training") as pbar:
             optim.step()
 
             train_losses.append(loss.item())
-            train_dscs.append(dice_score(y_pred.detach(), y_true).item())
+            train_dscs.append(dice_score(y_pred.round(), y_true).item())
 
             if i % TEST_INTERVAL == 0:
                 preds, targets = [], []
@@ -98,7 +91,7 @@ with tqdm(total=MAX_STEPS, desc="Training") as pbar:
                     targets = torch.cat(targets)
 
                     test_losses.append(F.binary_cross_entropy(preds, targets).item())
-                    test_dscs.append(dice_score(preds, targets).item())
+                    test_dscs.append(dice_score(preds.round(), targets).item())
 
                 _, ax = plt.subplots(1, 2, figsize=(10, 4))
 

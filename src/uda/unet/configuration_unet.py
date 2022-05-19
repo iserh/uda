@@ -16,7 +16,7 @@ class UNetConfig:
 
     def __init__(
         self,
-        n_classes: int,
+        out_channels: int,
         encoder_blocks: List[List[int]],
         decoder_blocks: List[List[int]],
         encoder_backbone: UNetBackbones = UNetBackbones.StackedConvolutions,
@@ -26,7 +26,7 @@ class UNetConfig:
         bilinear_upsampling: bool = False,
     ) -> None:
         """Args:
-        `n_classes` : Number of classes in the output.
+        `out_channels` : Number of output channels. If `n_channels=1` `Sigmoid` is used as final activation.
         `encoder_blocks` : Number of channels for each convolutional layer in each encoder block.
         `decoder_blocks` : Number of channels for each convolutional layer in each decoder block.
         `encoder_backbone` : Backbone to use for the encoder blocks.
@@ -35,7 +35,7 @@ class UNetConfig:
         `batch_norm_after_encoder` : Whether to use batch normalization after last encoder block.
         `bilinear_upsampling` : Whether to use bilinear upsampling instead of transposed convolution.
         """
-        self.n_classes = n_classes
+        self.out_channels = out_channels
         self.encoder_blocks = encoder_blocks
         self.decoder_blocks = decoder_blocks
         self.encoder_backbone = encoder_backbone

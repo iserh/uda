@@ -8,6 +8,7 @@ from tqdm import tqdm
 
 from uda import UNet, UNetConfig
 from uda.calgary_campinas_dataset import CalgaryCampinasDataset
+from uda.metrics import dice_score
 
 data_dir = Path("/tmp/data/CC359")
 output_dir = Path("/tmp/data/output")
@@ -20,10 +21,10 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 print(f"Using device: {device}")
 
 train_dataset = CalgaryCampinasDataset(
-    data_dir, vendor="GE_3", fold=1, train=True, patchify=(64, 128, 128), squash_patches=True
+    data_dir, vendor="GE_3", fold=1, train=True, patchify=(64, 256, 256), flatten_patches=True
 )
 test_dataset = CalgaryCampinasDataset(
-    data_dir, vendor="GE_3", fold=1, train=False, patchify=(64, 128, 128), squash_patches=True
+    data_dir, vendor="GE_3", fold=1, train=False, patchify=(64, 256, 256), flatten_patches=True
 )
 
 print(train_dataset.data.shape)
@@ -31,13 +32,13 @@ print(train_dataset.label.shape)
 print(train_dataset.voxel_dim.shape)
 
 # Create dataloaders
-train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=16, shuffle=True)
-test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=16, shuffle=False)
+train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=4, shuffle=True)
+test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=4, shuffle=False)
 
 # This configuration is similar to the preprint, but it uses smaller u-net blocks
 # to compensate for CPU limitations
 config = UNetConfig(
-    n_classes=1,
+    out_channels=1,
     dim=3,
     encoder_blocks=(
         (1, 8, 8),
@@ -60,14 +61,6 @@ model = UNet(config)
 
 n_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
 print(f"# parameters: {n_params:,}")
-
-
-def dice_score(pred: torch.Tensor, target: torch.Tensor) -> float:
-    pred = pred.reshape(-1)
-    target = target.reshape(-1)
-    intersection = (pred * target).sum()
-    return 2 * intersection / (pred.sum() + target.sum())
-
 
 model = UNet(config).to(device)
 optim = torch.optim.Adam(model.parameters(), lr=1e-4)
@@ -98,20 +91,17 @@ with tqdm(total=MAX_STEPS, desc="Training") as pbar:
             loss.backward()
             optim.step()
 
-            pred_mask = (y_pred.detach() > 0.5).float()
             train_losses.append(loss.item())
-            train_dscs.append(dice_score(pred_mask, y_true).item())
+            train_dscs.append(dice_score(y_pred.round(), y_true).item())
 
             if i % TEST_INTERVAL == 0:
-                preds, targets = [], []
                 with torch.no_grad():
                     preds, targets = [*zip(*[(model(x.to(device)).cpu(), y_true) for x, y_true in test_loader])]
                     preds = torch.cat(preds)
                     targets = torch.cat(targets)
 
-                    pred_mask = (preds > 0.5).float()
                     test_losses.append(F.binary_cross_entropy(preds, targets).item())
-                    test_dscs.append(dice_score(pred_mask, targets).item())
+                    test_dscs.append(dice_score(preds.round(), targets).item())
 
                 _, ax = plt.subplots(1, 2, figsize=(10, 4))
 

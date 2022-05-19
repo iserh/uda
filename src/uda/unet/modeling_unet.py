@@ -210,12 +210,13 @@ class UNetDecoder(nn.Module):
         # maps to classes
         self.mapping_conv = nn_.ConvNd(
             in_channels=config.decoder_blocks[-1][-1],
-            out_channels=config.n_classes,
+            out_channels=config.out_channels,
             kernel_size=1,
             stride=1,
             padding=0,
             bias=nn_.bias,
         )
+        self.final_act = nn.Sigmoid() if config.out_channels == 1 else nn.Softmax(dim=1)
         # cropping
         self.cropping = CropNd(dim=config.dim)
 
@@ -228,7 +229,7 @@ class UNetDecoder(nn.Module):
             x = block(x)
         # map to classes
         x = self.mapping_conv(x)
-        return x.sigmoid()
+        return self.final_act(x)
 
 
 class UNet(nn.Module):

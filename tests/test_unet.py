@@ -16,7 +16,7 @@ def device() -> str:
 @pytest.fixture()
 def unet_config_default() -> UNetConfig:
     return UNetConfig(
-        n_classes=2,
+        out_channels=2,
         encoder_blocks=[
             [1, 8, 8],
             [8, 16, 16],
