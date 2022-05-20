@@ -6,6 +6,7 @@
 .vscode
 htmlcov
 data
+config
 
 # files
 .coverage

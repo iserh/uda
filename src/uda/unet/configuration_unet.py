@@ -1,7 +1,8 @@
 """U-Net configuration."""
-import json
 from enum import Enum
 from typing import List
+
+from uda.config import Config
 
 
 class UNetBackbones(str, Enum):
@@ -11,7 +12,7 @@ class UNetBackbones(str, Enum):
     ResNet = "ResNet"
 
 
-class UNetConfig:
+class UNetConfig(Config):
     """Configuration for U-Net."""
 
     def __init__(
@@ -43,13 +44,3 @@ class UNetConfig:
         self.dim = dim
         self.batch_norm_after_encoder = batch_norm_after_encoder
         self.bilinear_upsampling = bilinear_upsampling
-
-    def save(self, path: str) -> None:
-        with open(path, "w") as f:
-            json.dump(self.__dict__, f, indent=4)
-
-    @classmethod
-    def from_file(cls, path: str) -> "UNetConfig":
-        with open(path, "r") as f:
-            config = cls(**json.load(f))
-        return config

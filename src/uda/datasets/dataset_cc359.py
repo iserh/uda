@@ -1,6 +1,6 @@
 """Loader for the Calgary Campinas dataset."""
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import List, Tuple
 
 import nibabel as nib
 import numpy as np
@@ -11,45 +11,28 @@ from sklearn.preprocessing import MinMaxScaler
 from torch.utils.data import Dataset
 from tqdm import tqdm
 
+from .configuration_cc359 import CC359Config
 
-class CalgaryCampinasDataset(Dataset):
+
+class CC359(Dataset):
     """Dataset class for loading Calgary Campinas dataset."""
 
     PADDING_SHAPE = (192, 256, 256)
 
-    def __init__(
-        self,
-        data_path: str,
-        vendor: str,
-        fold: Optional[int] = None,
-        train: bool = True,
-        rotate: bool = True,
-        flatten: bool = False,
-        patchify: Optional[Tuple[int]] = None,
-        flatten_patches: bool = True,
-        clip_intensities: Optional[Tuple[int]] = None,
-        random_state: int = 42,
-    ) -> None:
+    def __init__(self, data_path: str, config: CC359Config, train: bool = True) -> None:
         """Args:
         `data_path` : Dataset location
-        `vendor` : vendor
-        `fold` : Fold index for cross-validation
-        `train` : Whether to load training or test partition (only when fold is not None)
-        `rotate` : Rotate the images
-        `flatten` : Flatten the Z dimension
-        `patchify` : Patchify the images
-        `flatten_patches` : Flatten the patches
-        `random_state` : Random state for cross-validation
+        `config` : CC359Config
         """
-        self.vendor = vendor
-        self.fold = fold
         self.train = train
-        self.rotate = rotate
-        self.flatten = flatten
-        self.patchify = patchify
-        self.flatten_patches = flatten_patches
-        self.clip_intensities = clip_intensities
-        self.random_state = random_state
+        self.vendor = config.vendor
+        self.fold = config.fold
+        self.rotate = config.rotate
+        self.flatten = config.flatten
+        self.patchify = config.patchify
+        self.flatten_patches = config.flatten_patches
+        self.clip_intensities = config.clip_intensities
+        self.random_state = config.random_state
         self.load_files(data_path)
 
     def select_fold(self, files: List[str]) -> List[str]:
@@ -197,7 +180,7 @@ def unpatchify(t: torch.Tensor, size: Tuple[int], start: int = 3, patch_dim: int
 
 if __name__ == "__main__":
     data_path = Path("/home/iailab36/iser/uda-data")
-    dataset = CalgaryCampinasDataset(data_path, vendor="GE_3", fold=1, train=True, flatten=True)
+    dataset = CC359(data_path, vendor="GE_3", fold=1, train=True, flatten=True)
 
     print(dataset.data.shape)
     print(dataset.label.shape)

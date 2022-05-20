@@ -8,6 +8,12 @@ install:
     poetry install
 
 
+setup-run-config:
+    eval "$(conda shell.bash hook)" && \
+    conda activate uda && \
+    python scripts/setup_run_config.py
+
+
 # --------------------------------------------------
 # ----- mlflow -----
 # --------------------------------------------------
@@ -63,4 +69,3 @@ download-mms path=mms_path:
 _dl_mms path=mms_path:
     mkdir {{path}} --parents && \
     megatools dl --path {{path}}  https://mega.nz/folder/FxAmhbRJ#Dwugf8isRSR9CCZ6Qnza4w
-
