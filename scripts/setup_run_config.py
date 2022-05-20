@@ -12,7 +12,7 @@ ds_config = CC359Config(
     flatten=False,
     patchify=[64, 256, 256],
     flatten_patches=True,
-    clip_intensities=False,
+    clip_intensities=None,
     random_state=None,
 )
 
