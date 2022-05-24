@@ -28,7 +28,6 @@ def get_data_loaders(
 ) -> Tuple[DataLoader, DataLoader]:
     cc359 = run.use_artifact("CC359-Skull-stripping:latest")
     data_dir = cc359.download(root="/tmp/data/CC359")
-    print(data_dir)
 
     train_loader = DataLoader(CC359(data_dir, dataset_conf, train=True), batch_size=train_batch_size, shuffle=True)
     val_loader = DataLoader(CC359(data_dir, dataset_conf, train=False), batch_size=val_batch_size, shuffle=False)
@@ -120,7 +119,7 @@ def run(hparams: HParams, dataset_conf: CC359Config, unet_conf: UNetConfig) -> N
 
     # score function used for model checkpoint
     def score_function(engine: Engine) -> None:
-        return engine.state.metrics["dice"]
+        return engine.state.metrics["dice"].item()
 
     model_checkpoint = ModelCheckpoint(
         wandb_logger.run.dir,

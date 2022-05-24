@@ -39,7 +39,7 @@ unet_config = UNetConfig(
 )
 
 hparams = HParams(
-    epochs=25,
+    epochs=50,
     criterion="dice_loss",
     learning_rate=1e-4,
     optim="Adam",
