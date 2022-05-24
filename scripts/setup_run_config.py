@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from uda import HParamsConfig, UNetBackbones, UNetConfig
+from uda import HParams, UNetBackbones, UNetConfig
 from uda.datasets import CC359Config
 
 config_dir = Path("config")
@@ -38,15 +38,15 @@ unet_config = UNetConfig(
     decoder_backbone=UNetBackbones.StackedConvolutions,
 )
 
-hparams = HParamsConfig(
-    epochs=10,
+hparams = HParams(
+    epochs=25,
     criterion="dice_loss",
     learning_rate=1e-4,
     optim="Adam",
-    batch_size=4,
-    test_interval=100,
+    train_batch_size=4,
+    val_batch_size=4,
 )
 
-ds_config.save(config_dir / "cc359.json")
-unet_config.save(config_dir / "unet.json")
-hparams.save(config_dir / "hparams.json")
+ds_config.save(config_dir / "cc359.yml")
+unet_config.save(config_dir / "unet.yml")
+hparams.save(config_dir / "hparams.yml")

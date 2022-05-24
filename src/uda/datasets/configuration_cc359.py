@@ -12,9 +12,9 @@ class CC359Config(Config):
         fold: Optional[int] = None,
         rotate: bool = True,
         flatten: bool = False,
-        patchify: Optional[Tuple[int]] = None,
+        patchify: Optional[Tuple[int, int, int]] = None,
         flatten_patches: bool = True,
-        clip_intensities: Optional[Tuple[int]] = None,
+        clip_intensities: Optional[Tuple[int, int]] = None,
         random_state: Optional[int] = None,
     ) -> None:
         """Args:

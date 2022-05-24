@@ -8,6 +8,7 @@ ignore = """
     ANN003 # Missing type annotation for kwargs in method
     ANN101 # Missing type annotation for self in method
     ANN102 # Missing type annotation for cls in method
+    ANN401 # Dynamically typed expressions (typing.Any) are disallowed
     D403 # First word of the first line should be properly capitalized
     D415 # First line should end with a period, question mark, or exclamation point
     E203 # whitespace before ':'

@@ -1,9 +1,18 @@
-import json
-from typing import Callable, Type
+from enum import Enum
+from typing import Any, Callable, Type
 
 import torch.optim as optim
+import yaml
+from yaml import Node
 
 import uda.losses as losses
+
+
+class EnumDumper(yaml.SafeDumper):
+    def represent_data(self, data: Any) -> Node:
+        if isinstance(data, Enum):
+            return self.represent_data(data.value)
+        return super().represent_data(data)
 
 
 class Config:
@@ -11,16 +20,16 @@ class Config:
 
     def save(self, path: str) -> None:
         with open(path, "w") as f:
-            json.dump(self.__dict__, f, indent=4)
+            yaml.dump(self.__dict__, f, Dumper=EnumDumper)
 
     @classmethod
     def from_file(cls, path: str) -> "Config":
         with open(path, "r") as f:
-            config = cls(**json.load(f))
+            config = cls(**yaml.load(f, Loader=yaml.SafeLoader))
         return config
 
 
-class HParamsConfig(Config):
+class HParams(Config):
     """Configuration for Hyperparameters."""
 
     def __init__(
@@ -28,9 +37,9 @@ class HParamsConfig(Config):
         epochs: int = 10,
         criterion: str = "dice_loss",
         learning_rate: float = 1e-4,
-        optim: str = "adam",
-        batch_size: int = 4,
-        test_interval: int = 100,
+        optim: str = "Adam",
+        train_batch_size: int = 4,
+        val_batch_size: int = 4,
     ) -> None:
         """Args:
         `epochs`: Number of epochs for training
@@ -44,8 +53,8 @@ class HParamsConfig(Config):
         self.criterion = criterion
         self.learning_rate = learning_rate
         self.optim = optim
-        self.batch_size = batch_size
-        self.test_interval = test_interval
+        self.train_batch_size = train_batch_size
+        self.val_batch_size = val_batch_size
 
     def get_optim(self) -> Type[optim.Optimizer]:
         return getattr(optim, self.optim)

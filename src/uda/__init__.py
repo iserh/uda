@@ -1,7 +1,7 @@
 """Unsupervised Domain Adaptation."""
 from importlib.metadata import version
 
-from .config import HParamsConfig  # noqa: F401
+from .config import HParams  # noqa: F401
 from .unet import UNet, UNetBackbones, UNetConfig  # noqa: F401
 
 try:

@@ -1,128 +1,154 @@
 from pathlib import Path
-from tempfile import TemporaryDirectory
+from typing import Tuple
 
-import mlflow
+import ignite
 import torch
-from mlflow import log_artifact, log_metrics, log_params
-from tqdm import tqdm
+import wandb
+from ignite.contrib.handlers.tqdm_logger import ProgressBar
+from ignite.contrib.handlers.wandb_logger import WandBLogger
+from ignite.engine import Engine, Events, create_supervised_evaluator, create_supervised_trainer
+from ignite.handlers import ModelCheckpoint, global_step_from_engine
+from ignite.metrics import ConfusionMatrix, DiceCoefficient, EpochMetric, Loss
+from ignite.utils import setup_logger
+from torch.utils.data import DataLoader
+from wandb.wandb_run import Run
 
-from uda import HParamsConfig, UNet, UNetConfig
+from uda import HParams, UNet, UNetConfig
 from uda.datasets import CC359, CC359Config
 from uda.metrics import dice_score
 
-# directories
-data_dir = Path("/tmp/data/CC359")
-config_dir = Path("config")
 
-# setup mlflow
-mlflow.set_tracking_uri("http://localhost:5000")
-
-experiment_name = "U-Net Training"
-print(f"Running in Experiment: '{experiment_name}'")
-if (experiment := mlflow.get_experiment_by_name(experiment_name)) is None:
-    experiment_id = mlflow.create_experiment(name=experiment_name)
-else:
-    experiment_id = experiment.experiment_id
-
-# configure the device used for training
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-print(f"Using device: {device}")
-
-# load configuration files
-ds_config = CC359Config.from_file(config_dir / "cc359.json")
-unet_config = UNetConfig.from_file(config_dir / "unet.json")
-hparams = HParamsConfig.from_file(config_dir / "hparams.json")
-
-# load dataset
-train_dataset = CC359(data_dir, ds_config, train=True)
-test_dataset = CC359(data_dir, ds_config, train=False)
-
-print(train_dataset.data.shape)
-print(train_dataset.label.shape)
-print(train_dataset.voxel_dim.shape)
-
-# Create dataloaders
-train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=hparams.batch_size, shuffle=True)
-test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=hparams.batch_size, shuffle=False)
-
-model = UNet(unet_config)
-
-n_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
-print(f"# parameters: {n_params:,}")
-
-model = model.to(device)
-optim = hparams.get_optim()(model.parameters(), lr=hparams.learning_rate)
-criterion = hparams.get_criterion()
+def flatten_output(output: Tuple[torch.Tensor, torch.Tensor]) -> None:
+    y_pred, y = output
+    return y_pred.round().long().flatten(), y.flatten()
 
 
-# ------------------------------
-# ----- Training
-# ------------------------------
-run_name = f"{model.__class__.__name__}_{train_dataset.__class__.__name__}"
+def get_data_loaders(
+    run: Run, dataset_conf: CC359Config, train_batch_size: int, val_batch_size: int
+) -> Tuple[DataLoader, DataLoader]:
+    cc359 = run.use_artifact("CC359-Skull-stripping:latest")
+    data_dir = cc359.download(root="/tmp/data/CC359")
+    print(data_dir)
 
-with mlflow.start_run(experiment_id=experiment_id, run_name=run_name), TemporaryDirectory() as tempdir:
-    tempdir = Path(tempdir)
-    # log params
-    log_params(
-        {
-            "n_params": n_params,
-            "optim": optim.__class__.__name__,
-            "criterion": criterion.__name__,
-            **ds_config.__dict__,
-            **hparams.__dict__,
-        }
+    train_loader = DataLoader(CC359(data_dir, dataset_conf, train=True), batch_size=train_batch_size, shuffle=True)
+    val_loader = DataLoader(CC359(data_dir, dataset_conf, train=False), batch_size=val_batch_size, shuffle=False)
+    return train_loader, val_loader
+
+
+def binary_one_hot_output_transform(output: Tuple[torch.Tensor, torch.Tensor]) -> Tuple[torch.Tensor, torch.Tensor]:
+    y_pred, y = output
+    y_pred = y_pred.round().long()
+    y_pred = ignite.utils.to_onehot(y_pred, 2)
+    return y_pred, y.long()
+
+
+def run(hparams: HParams, dataset_conf: CC359Config, unet_conf: UNetConfig) -> None:
+    run = wandb.init(
+        project="UDA",
+        name="CC359-UNet",
+        config={
+            "hparams": hparams.__dict__,
+            "dataset_configuration": dataset_conf.__dict__,
+            "unet_configuration": unet_conf.__dict__,
+        },
     )
 
-    # log artifacts
-    log_artifact(config_dir / "cc359.json")
-    log_artifact(config_dir / "unet.json")
-    log_artifact(config_dir / "hparams.json")
+    train_loader, val_loader = get_data_loaders(run, dataset_conf, hparams.train_batch_size, hparams.val_batch_size)
 
-    i = 0
-    for e in range(1, hparams.epochs + 1):
-        for x, y_true in (pbar := tqdm(train_loader, desc=f"Training Epoch {e}/{hparams.epochs}")):
-            i += 1
+    # -------------------- model, loss, metrics --------------------
 
-            x = x.to(device)
-            y_true = y_true.to(device)
+    model = UNet(unet_conf)
+    n_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    print(f"# parameters: {n_params:,}")
 
-            optim.zero_grad()
-            y_pred = model(x)
-            train_loss = criterion(y_pred, y_true)
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    print(f"Using device: {device}")
 
-            train_loss.backward()
-            optim.step()
+    model.to(device)  # Move model before creating optimizer
+    optimizer = hparams.get_optim()(model.parameters(), lr=hparams.learning_rate)
+    criterion = hparams.get_criterion()
 
-            train_dsc = dice_score(y_pred.round(), y_true)
-            log_metrics({"train_loss": train_loss, "train_dsc": train_dsc}, step=i)
+    # metrics
+    dice_metric = EpochMetric(compute_fn=dice_score, output_transform=flatten_output)
+    cm = ConfusionMatrix(num_classes=2, output_transform=binary_one_hot_output_transform)
+    metrics = {"dice": DiceCoefficient(cm, ignore_index=0), "loss": Loss(criterion), "dice2": dice_metric}
 
-            if i % hparams.test_interval == 0:
-                # Evaluate on test set
-                with torch.no_grad():
-                    preds, targets = [
-                        *zip(
-                            *[
-                                (model(x.to(device)).cpu(), y_true)
-                                for x, y_true in tqdm(test_loader, desc="Testing", leave=False)
-                            ]
-                        )
-                    ]
-                preds = torch.cat(preds)
-                targets = torch.cat(targets)
+    # -------------------- trainer & evaluators --------------------
 
-                test_loss = criterion(preds, targets)
-                test_dsc = dice_score(preds.round(), targets)
+    trainer = create_supervised_trainer(model, optimizer, criterion, device=device)
+    trainer.logger = setup_logger("Trainer")
 
-                log_metrics({"test_loss": test_loss, "test_dsc": test_dsc}, step=i)
+    train_evaluator = create_supervised_evaluator(model, metrics=metrics, device=device)
+    train_evaluator.logger = setup_logger("Train Evaluator")
 
-        pbar.set_postfix(
-            {
-                "loss": train_loss,
-                "train_dsc": train_dsc,
-                "test_dsc": test_dsc if "test_dsc" in locals() else 0,
-            }
+    validation_evaluator = create_supervised_evaluator(model, metrics=metrics, device=device)
+    validation_evaluator.logger = setup_logger("Val Evaluator")
+
+    # evaluation callback
+    @trainer.on(Events.EPOCH_COMPLETED)
+    def compute_metrics(engine: Engine) -> None:
+        train_evaluator.run(train_loader)
+        validation_evaluator.run(val_loader)
+
+    # -------------------- Handlers --------------------
+    # -----------------------------------------------------
+
+    # ---------- tqdm ----------
+    pbar = ProgressBar()
+    pbar.attach(trainer)
+
+    # -------------------- WandB --------------------
+
+    wandb_logger = WandBLogger(id=run.id)
+    wandb_logger.attach_output_handler(
+        trainer,
+        event_name=Events.ITERATION_COMPLETED,
+        tag="training",
+        output_transform=lambda loss: {"batchloss": loss},
+    )
+
+    for tag, evaluator in [("training", train_evaluator), ("validation", validation_evaluator)]:
+        wandb_logger.attach_output_handler(
+            evaluator,
+            event_name=Events.EPOCH_COMPLETED,
+            tag=tag,
+            metric_names=list(metrics.keys()),
+            global_step_transform=lambda *_: trainer.state.iteration,
         )
 
-    model.cpu()
-    model.save(tempdir / "unet.pt")
-    log_artifact(tempdir / "unet.pt")
+    # -------------------- model checkpoint --------------------
+
+    # score function used for model checkpoint
+    def score_function(engine: Engine) -> None:
+        return engine.state.metrics["dice"]
+
+    model_checkpoint = ModelCheckpoint(
+        wandb_logger.run.dir,
+        n_saved=1,
+        filename_prefix="best",
+        score_function=score_function,
+        score_name="validation_dice",
+        global_step_transform=global_step_from_engine(trainer),
+    )
+
+    validation_evaluator.add_event_handler(Events.COMPLETED, model_checkpoint, {"model": model})
+
+    # -------------------- training --------------------
+
+    # kick everything off
+    trainer.run(train_loader, max_epochs=hparams.epochs)
+
+    wandb_logger.close()
+
+
+if __name__ == "__main__":
+    # directories
+    data_dir = Path("/tmp/data/CC359")
+    config_dir = Path("config")
+
+    # load configuration files
+    dataset_conf = CC359Config.from_file(config_dir / "cc359.yml")
+    unet_conf = UNetConfig.from_file(config_dir / "unet.yml")
+    hparams = HParams.from_file(config_dir / "hparams.yml")
+
+    run(hparams, dataset_conf, unet_conf)
