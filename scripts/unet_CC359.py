@@ -46,9 +46,9 @@ def run(hparams: HParams, dataset_conf: CC359Config, unet_conf: UNetConfig) -> N
         project="UDA",
         name="CC359-UNet",
         config={
-            "hparams": hparams.__dict__,
-            "dataset_configuration": dataset_conf.__dict__,
-            "unet_configuration": unet_conf.__dict__,
+            "hp": hparams.__dict__,
+            "ds": dataset_conf.__dict__,
+            "unet": unet_conf.__dict__,
         },
     )
 
@@ -68,9 +68,8 @@ def run(hparams: HParams, dataset_conf: CC359Config, unet_conf: UNetConfig) -> N
     criterion = hparams.get_criterion()
 
     # metrics
-    dice_metric = EpochMetric(compute_fn=dice_score, output_transform=flatten_output)
     cm = ConfusionMatrix(num_classes=2, output_transform=binary_one_hot_output_transform)
-    metrics = {"dice": DiceCoefficient(cm, ignore_index=0), "loss": Loss(criterion), "dice2": dice_metric}
+    metrics = {"dice": DiceCoefficient(cm, ignore_index=0), "loss": Loss(criterion)}
 
     # -------------------- trainer & evaluators --------------------
 

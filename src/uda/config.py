@@ -47,7 +47,6 @@ class HParams(Config):
         `learning_rate` : Learning rate
         `optim`: Optimizer Name
         `batch_size`: Batch Size for training
-        `test_interval`: Interval of training
         """
         self.epochs = epochs
         self.criterion = criterion
