@@ -35,7 +35,7 @@ class NNModules:
         self.bias = False
 
 
-class StackedConvBlock(nn.Module):
+class VanillaBlock(nn.Module):
     """U-Net block consisting of a convolutional stack with ReLU activations in between."""
 
     def __init__(self, hidden_sizes: List[int], dim: int) -> None:
@@ -145,9 +145,9 @@ class ResNetBlock(nn.Module):
         return x
 
 
-def _get_backbone_class(backbone: str) -> Union[Type[StackedConvBlock], Type[ResNetBlock]]:
-    if backbone == UNetBackbones.StackedConvolutions:
-        return StackedConvBlock
+def _get_backbone_class(backbone: str) -> Union[Type[VanillaBlock], Type[ResNetBlock]]:
+    if backbone == UNetBackbones.Vanilla:
+        return VanillaBlock
     elif backbone == UNetBackbones.ResNet:
         return ResNetBlock
     else:

@@ -15,12 +15,7 @@ from wandb.wandb_run import Run
 
 from uda import HParams, UNet, UNetConfig
 from uda.datasets import CC359, CC359Config
-from uda.metrics import dice_score
-
-
-def flatten_output(output: Tuple[torch.Tensor, torch.Tensor]) -> None:
-    y_pred, y = output
-    return y_pred.round().long().flatten(), y.flatten()
+from uda.metrics import SurfaceDice, dice_score
 
 
 def get_data_loaders(
@@ -68,6 +63,7 @@ def run(hparams: HParams, dataset_conf: CC359Config, unet_conf: UNetConfig) -> N
     criterion = hparams.get_criterion()
 
     # metrics
+    individual_dice = EpochMetric(comp)
     cm = ConfusionMatrix(num_classes=2, output_transform=binary_one_hot_output_transform)
     metrics = {"dice": DiceCoefficient(cm, ignore_index=0), "loss": Loss(criterion)}
 

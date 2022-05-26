@@ -10,7 +10,7 @@ ds_config = CC359Config(
     fold=1,
     rotate=True,
     flatten=False,
-    patchify=[64, 256, 256],
+    patch_dims=[64, 256, 256],
     flatten_patches=True,
     clip_intensities=None,
     random_state=None,
@@ -34,8 +34,8 @@ unet_config = UNetConfig(
         [32, 16, 16],
         [16, 8, 8],
     ],
-    encoder_backbone=UNetBackbones.StackedConvolutions,
-    decoder_backbone=UNetBackbones.StackedConvolutions,
+    encoder_backbone=UNetBackbones.Vanilla,
+    decoder_backbone=UNetBackbones.Vanilla,
 )
 
 hparams = HParams(

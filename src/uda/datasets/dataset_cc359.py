@@ -29,7 +29,7 @@ class CC359(Dataset):
         self.fold = config.fold
         self.rotate = config.rotate
         self.flatten = config.flatten
-        self.patchify = config.patchify
+        self.patchify = config.patch_dims
         self.flatten_patches = config.flatten_patches
         self.clip_intensities = config.clip_intensities
         self.random_state = config.random_state

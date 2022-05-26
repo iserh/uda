@@ -8,7 +8,7 @@ from uda.config import Config
 class UNetBackbones(str, Enum):
     """Backbones for the U-Net."""
 
-    StackedConvolutions = "StackedConvolutions"
+    Vanilla = "Vanilla"
     ResNet = "ResNet"
 
 
@@ -20,8 +20,8 @@ class UNetConfig(Config):
         out_channels: int,
         encoder_blocks: List[List[int]],
         decoder_blocks: List[List[int]],
-        encoder_backbone: UNetBackbones = UNetBackbones.StackedConvolutions,
-        decoder_backbone: UNetBackbones = UNetBackbones.StackedConvolutions,
+        encoder_backbone: UNetBackbones = UNetBackbones.Vanilla,
+        decoder_backbone: UNetBackbones = UNetBackbones.Vanilla,
         dim: int = 2,
         batch_norm_after_encoder: bool = True,
         bilinear_upsampling: bool = False,

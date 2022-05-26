@@ -12,7 +12,7 @@ class CC359Config(Config):
         fold: Optional[int] = None,
         rotate: bool = True,
         flatten: bool = False,
-        patchify: Optional[Tuple[int, int, int]] = None,
+        patch_dims: Optional[Tuple[int, int, int]] = None,
         flatten_patches: bool = True,
         clip_intensities: Optional[Tuple[int, int]] = None,
         random_state: Optional[int] = None,
@@ -23,7 +23,7 @@ class CC359Config(Config):
         `fold` : Fold index for cross-validation
         `rotate` : Rotate the images
         `flatten` : Flatten the Z dimension
-        `patchify` : Patchify the images
+        `patch_dims` : Patch dimensions for slicing the images
         `flatten_patches` : Flatten the patches
         `random_state` : Random state for cross-validation
         """
@@ -31,7 +31,7 @@ class CC359Config(Config):
         self.fold = fold
         self.rotate = rotate
         self.flatten = flatten
-        self.patchify = patchify
+        self.patch_dims = patch_dims
         self.flatten_patches = flatten_patches
         self.clip_intensities = clip_intensities
         self.random_state = random_state
