@@ -29,8 +29,8 @@ def dice_score(pred: torch.Tensor, target: torch.Tensor, dim: int = 0, square_de
 
 
 def EpochDice(
+    orig_shape: Tuple[int, int, int],
     reduce_mean: bool = True,
-    orig_shape: Optional[Tuple[int, int, int]] = None,
     patch_dims: Optional[Tuple[int, int, int]] = None,
     check_compute_fn: bool = False,
 ) -> EpochMetric:
@@ -41,14 +41,14 @@ def EpochDice(
             y_pred = y_pred.reshape(-1, np.prod(n_patches), *patch_dims)
             # unpatchify
             y_pred = unpatchify(y_pred, orig_shape, start=2)
-            y = y.reshape(-1, *orig_shape)
+
+        # reshape to 3d volume
+        y_pred = y_pred.reshape(-1, *orig_shape)
+        y = y.reshape(-1, *orig_shape)
 
         return dice_score(y_pred, y, 0 if reduce_mean else 1)
 
-    def output_transform(output: Tuple[torch.Tensor, torch.Tensor]) -> Tuple[torch.Tensor, torch.Tensor]:
-        return flatten_output(output, dim=0 if reduce_mean else 1)
-
-    return EpochMetric(compute_fn, output_transform, check_compute_fn)
+    return EpochMetric(compute_fn, flatten_output, check_compute_fn)
 
 
 def SurfaceDice(
