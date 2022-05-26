@@ -40,6 +40,7 @@ class HParams(Config):
         optim: str = "Adam",
         train_batch_size: int = 4,
         val_batch_size: int = 4,
+        sdice_tolerance: float = 0.5,
     ) -> None:
         """Args:
         `epochs`: Number of epochs for training
@@ -54,6 +55,7 @@ class HParams(Config):
         self.optim = optim
         self.train_batch_size = train_batch_size
         self.val_batch_size = val_batch_size
+        self.sdice_tolerance = sdice_tolerance
 
     def get_optim(self) -> Type[optim.Optimizer]:
         return getattr(optim, self.optim)

@@ -1,31 +1,17 @@
 from typing import Optional, Tuple
 
+import numpy as np
 import torch
 from ignite.metrics import EpochMetric
 from surface_distance import compute_surface_dice_at_tolerance, compute_surface_distances
+from tqdm import tqdm
+
+from .utils import unpatchify
 
 
-class EpochDice(EpochMetric):
-    def __init__(
-        self,
-        check_compute_fn: bool = True,
-        patch_dims: Optional[Tuple[int, int, int]] = None,
-    ) -> None:
-        self.patch_dims = patch_dims
-        super(SurfaceDice, self).__init__(self.compute_surface_dice_at_tolerance, flatten_output, check_compute_fn)
-
-    def compute_surface_dice_at_tolerance(self, y_pred: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
-        if self.patch_dims is not None:
-            # y_pred has shape []
-            # unpatchify
-            data = data.reshape(-1, np.prod(test_dataset.n_patches), *test_dataset.patchify)
-            label = label.reshape(-1, np.prod(test_dataset.n_patches), *test_dataset.patchify)
-            pred = pred.reshape(-1, np.prod(test_dataset.n_patches), *test_dataset.patchify)
-            data = unpatchify(data, test_dataset.PADDING_SHAPE, start=2)
-            label = unpatchify(label, test_dataset.PADDING_SHAPE, start=2)
-            pred = unpatchify(pred, test_dataset.PADDING_SHAPE, start=2)
-
-        pass
+def flatten_output(output: Tuple[torch.Tensor, torch.Tensor], dim: int = 0) -> None:
+    y_pred, y = output
+    return y_pred.round().long().flatten(dim), y.flatten(dim)
 
 
 def dice_score(pred: torch.Tensor, target: torch.Tensor, dim: int = 0, square_denom: bool = False) -> torch.Tensor:
@@ -42,17 +28,65 @@ def dice_score(pred: torch.Tensor, target: torch.Tensor, dim: int = 0, square_de
     return num / denom
 
 
-class SurfaceDice(EpochMetric):
-    def __init__(self, spacing_mm: torch.Tensor, tolerance_mm: float, check_compute_fn: bool = True) -> None:
-        self.spacing_mm = spacing_mm
-        self.tolerance_mm = tolerance_mm
-        super(SurfaceDice, self).__init__(self.compute_surface_dice_at_tolerance, flatten_output, check_compute_fn)
+def EpochDice(
+    reduce_mean: bool = True,
+    orig_shape: Optional[Tuple[int, int, int]] = None,
+    patch_dims: Optional[Tuple[int, int, int]] = None,
+    check_compute_fn: bool = False,
+) -> EpochMetric:
+    def compute_fn(y_pred: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
+        if patch_dims is not None:
+            # move n_patches in seperate dimension
+            n_patches = [int(s / pd) for pd, s in zip(patch_dims, orig_shape)]
+            y_pred = y_pred.reshape(-1, np.prod(n_patches), *patch_dims)
+            # unpatchify
+            y_pred = unpatchify(y_pred, orig_shape, start=2)
+            y = y.reshape(-1, *orig_shape)
 
-    def compute_surface_dice_at_tolerance(self, y_pred: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
-        surface_distances = compute_surface_distances(y.numpy(), y_pred.numpy(), self.spacing_mm)
-        return torch.Tensor(compute_surface_dice_at_tolerance(surface_distances, self.tolerance_mm))
+        return dice_score(y_pred, y, 0 if reduce_mean else 1)
+
+    def output_transform(output: Tuple[torch.Tensor, torch.Tensor]) -> Tuple[torch.Tensor, torch.Tensor]:
+        return flatten_output(output, dim=0 if reduce_mean else 1)
+
+    return EpochMetric(compute_fn, output_transform, check_compute_fn)
 
 
-def flatten_output(output: Tuple[torch.Tensor, torch.Tensor]) -> None:
-    y_pred, y = output
-    return y_pred.round().long().flatten(), y.flatten()
+def SurfaceDice(
+    spacing_mm: torch.Tensor,
+    tolerance_mm: float,
+    orig_shape: Tuple[int, int, int],
+    reduce_mean: bool = True,
+    patch_dims: Optional[Tuple[int, int, int]] = None,
+    check_compute_fn: bool = False,
+    prog_bar: bool = False,
+) -> EpochMetric:
+    def compute_fn(y_pred: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
+        if patch_dims is not None:
+            # move n_patches in seperate dimension
+            n_patches = [int(s / pd) for pd, s in zip(patch_dims, orig_shape)]
+            y_pred = y_pred.reshape(-1, np.prod(n_patches), *patch_dims)
+            # unpatchify
+            y_pred = unpatchify(y_pred, orig_shape, start=2)
+
+        # reshape to 3d volume
+        y_pred = y_pred.reshape(-1, *orig_shape)
+        y = y.reshape(-1, *orig_shape)
+
+        iterator = (
+            tqdm(zip(y_pred, y, spacing_mm), total=len(y_pred), desc="Computing surface dice", leave=False)
+            if prog_bar
+            else zip(y_pred, y, spacing_mm)
+        )
+
+        surface_dice_vals = torch.Tensor(
+            [
+                compute_surface_dice_at_tolerance(
+                    compute_surface_distances(y_.bool().numpy(), y_pred_.bool().numpy(), spacing), tolerance_mm
+                )
+                for y_pred_, y_, spacing in iterator
+            ]
+        )
+
+        return surface_dice_vals.mean() if reduce_mean else surface_dice_vals
+
+    return EpochMetric(compute_fn, flatten_output, check_compute_fn)

@@ -11,6 +11,8 @@ from sklearn.preprocessing import MinMaxScaler
 from torch.utils.data import Dataset
 from tqdm import tqdm
 
+from uda.utils import patchify
+
 from .configuration_cc359 import CC359Config
 
 
@@ -29,7 +31,7 @@ class CC359(Dataset):
         self.fold = config.fold
         self.rotate = config.rotate
         self.flatten = config.flatten
-        self.patchify = config.patch_dims
+        self.patch_dims = config.patch_dims
         self.flatten_patches = config.flatten_patches
         self.clip_intensities = config.clip_intensities
         self.random_state = config.random_state
@@ -77,7 +79,7 @@ class CC359(Dataset):
 
         scaler = MinMaxScaler()
 
-        images, labels, voxel_dims = [], [], []
+        images, labels, spacing_mm = [], [], []
         for file in tqdm(files, desc="Loading files"):
             nib_img: SpatialImage = nib.load(file)
             img = nib_img.get_fdata("unchanged", dtype=np.float32)
@@ -99,42 +101,39 @@ class CC359(Dataset):
             img = self.pad_array(img)
             label = self.pad_array(label)
 
-            voxel_dim = np.array([nib_img.header.get_zooms()])
-
             images.append(img)
             labels.append(label)
-            voxel_dims.append(voxel_dim)
+            spacing_mm.append(np.array(nib_img.header.get_zooms()))
 
         # stack and convert to torch tensors
         data = torch.from_numpy(np.stack(images))
         label = torch.from_numpy(np.stack(labels))
-        voxel_dim = torch.from_numpy(np.stack(voxel_dims))
+        spacing_mm = torch.from_numpy(np.stack(spacing_mm))
 
         if self.flatten:
             data = data.reshape(-1, *data.shape[-2:])
             label = label.reshape(-1, *label.shape[-2:])
-            voxel_dim = voxel_dim.reshape(-1, voxel_dim.shape[-1])
 
         # add channel dimension
         data = data.unsqueeze(1)
         label = label.unsqueeze(1)
 
         # patchify the data
-        if self.patchify is not None:
-            data = patchify(data, self.patchify)
-            label = patchify(label, self.patchify)
-            self.n_patches = data.shape[2 : 2 + len(self.patchify)]
+        if self.patch_dims is not None:
+            data = patchify(data, self.patch_dims)
+            label = patchify(label, self.patch_dims)
+            self.n_patches = data.shape[2 : 2 + len(self.patch_dims)]
 
             if self.flatten_patches:
-                data = data.reshape(-1, 1, *self.patchify)
-                label = label.reshape(-1, 1, *self.patchify)
+                data = data.reshape(-1, 1, *self.patch_dims)
+                label = label.reshape(-1, 1, *self.patch_dims)
             else:
-                data = data.reshape(data.shape[0], -1, 1, *self.patchify)
-                label = label.reshape(label.shape[0], -1, 1, *self.patchify)
+                data = data.reshape(data.shape[0], -1, 1, *self.patch_dims)
+                label = label.reshape(label.shape[0], -1, 1, *self.patch_dims)
 
         self.data = data
         self.label = label
-        self.voxel_dim = voxel_dim
+        self.spacing_mm = spacing_mm
 
     def __len__(self) -> int:
         return len(self.data)
@@ -144,44 +143,3 @@ class CC359(Dataset):
         labels = self.label[idx]
 
         return data, labels
-
-
-def patchify(t: torch.Tensor, size: Tuple[int], start: int = 2) -> torch.Tensor:
-    """Args:
-    `t` : Tensor to patchify
-    `size` : Patch size
-    `start` : Starting index of the dimensions to patchify
-    """
-    # offset is needed because in each iteration one axis gets added
-    for offset, (i, dim_size) in enumerate(enumerate(size, start=start)):
-        t = torch.stack(t.split(dim_size, dim=i + offset), dim=i)
-    return t
-
-
-def unpatchify(t: torch.Tensor, size: Tuple[int], start: int = 3, patch_dim: int = 1) -> torch.Tensor:
-    """Args:
-    `t` : Tensor to unpatchify
-    `size` : Unpatchified size
-    `start` : Starting index of the dimensions to unpatchify
-    `patch_dim` : Dimension of the patch
-    """
-    # compute number of patches for each patch dimension
-    n_patches = [patch_size // t_size for patch_size, t_size in zip(size, t.shape[start:])]
-    # reshape tensor with unfolded patches
-    t = t.reshape(*t.shape[:patch_dim], *n_patches, *t.shape[start:])
-    # reset start dimension (unfolding added dimensions in front)
-    patch_dim_end = patch_dim + len(size) - 1
-    # concatenate patches
-    for i in range(len(size)):
-        t = torch.cat(t.split(1, patch_dim_end - i), dim=-i - 1)
-    # squash patch dimensions
-    return t.reshape(*t.shape[:patch_dim], *size)
-
-
-if __name__ == "__main__":
-    data_path = Path("/home/iailab36/iser/uda-data")
-    dataset = CC359(data_path, vendor="GE_3", fold=1, train=True, flatten=True)
-
-    print(dataset.data.shape)
-    print(dataset.label.shape)
-    print(dataset.voxel_dim.shape)

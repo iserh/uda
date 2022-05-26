@@ -8,25 +8,13 @@ from ignite.contrib.handlers.tqdm_logger import ProgressBar
 from ignite.contrib.handlers.wandb_logger import WandBLogger
 from ignite.engine import Engine, Events, create_supervised_evaluator, create_supervised_trainer
 from ignite.handlers import ModelCheckpoint, global_step_from_engine
-from ignite.metrics import ConfusionMatrix, DiceCoefficient, EpochMetric, Loss
+from ignite.metrics import ConfusionMatrix, DiceCoefficient, Loss
 from ignite.utils import setup_logger
 from torch.utils.data import DataLoader
-from wandb.wandb_run import Run
 
 from uda import HParams, UNet, UNetConfig
 from uda.datasets import CC359, CC359Config
-from uda.metrics import SurfaceDice, dice_score
-
-
-def get_data_loaders(
-    run: Run, dataset_conf: CC359Config, train_batch_size: int, val_batch_size: int
-) -> Tuple[DataLoader, DataLoader]:
-    cc359 = run.use_artifact("CC359-Skull-stripping:latest")
-    data_dir = cc359.download(root="/tmp/data/CC359")
-
-    train_loader = DataLoader(CC359(data_dir, dataset_conf, train=True), batch_size=train_batch_size, shuffle=True)
-    val_loader = DataLoader(CC359(data_dir, dataset_conf, train=False), batch_size=val_batch_size, shuffle=False)
-    return train_loader, val_loader
+from uda.metrics import EpochDice, SurfaceDice
 
 
 def binary_one_hot_output_transform(output: Tuple[torch.Tensor, torch.Tensor]) -> Tuple[torch.Tensor, torch.Tensor]:
@@ -47,7 +35,14 @@ def run(hparams: HParams, dataset_conf: CC359Config, unet_conf: UNetConfig) -> N
         },
     )
 
-    train_loader, val_loader = get_data_loaders(run, dataset_conf, hparams.train_batch_size, hparams.val_batch_size)
+    cc359 = run.use_artifact("CC359-Skull-stripping:latest")
+    data_dir = cc359.download(root="/tmp/data/CC359")
+
+    train_dataset = CC359(data_dir, dataset_conf, train=True)
+    val_dataset = CC359(data_dir, dataset_conf, train=False)
+
+    train_loader = DataLoader(train_dataset, batch_size=hparams.train_batch_size, shuffle=True)
+    val_loader = DataLoader(val_dataset, batch_size=hparams.val_batch_size, shuffle=False)
 
     # -------------------- model, loss, metrics --------------------
 
@@ -63,9 +58,20 @@ def run(hparams: HParams, dataset_conf: CC359Config, unet_conf: UNetConfig) -> N
     criterion = hparams.get_criterion()
 
     # metrics
-    individual_dice = EpochMetric(comp)
     cm = ConfusionMatrix(num_classes=2, output_transform=binary_one_hot_output_transform)
     metrics = {"dice": DiceCoefficient(cm, ignore_index=0), "loss": Loss(criterion)}
+
+    final_metrics = {
+        "dice": EpochDice(reduce_mean=False, orig_shape=val_dataset.PADDING_SHAPE, patch_dims=val_dataset.patch_dims),
+        "surface_dice": SurfaceDice(
+            reduce_mean=False,
+            orig_shape=val_dataset.PADDING_SHAPE,
+            patch_dims=val_dataset.patch_dims,
+            spacing_mm=val_dataset.spacing_mm,
+            tolerance_mm=hparams.sdice_tolerance,
+            prog_bar=True,
+        ),
+    }
 
     # -------------------- trainer & evaluators --------------------
 
@@ -78,11 +84,24 @@ def run(hparams: HParams, dataset_conf: CC359Config, unet_conf: UNetConfig) -> N
     validation_evaluator = create_supervised_evaluator(model, metrics=metrics, device=device)
     validation_evaluator.logger = setup_logger("Val Evaluator")
 
+    final_evaluator = create_supervised_evaluator(model, metrics=final_metrics, device=device)
+    final_evaluator.logger = setup_logger("Final Evaluator")
+
+    # # test some things on startup
+    # @trainer.on(Events.STARTED)
+    # def start_up_hook(engine: Engine) -> None:
+    #     final_evaluator.run(val_loader)
+
     # evaluation callback
     @trainer.on(Events.EPOCH_COMPLETED)
     def compute_metrics(engine: Engine) -> None:
         train_evaluator.run(train_loader)
         validation_evaluator.run(val_loader)
+
+    # final evaluation
+    @trainer.on(Events.COMPLETED)
+    def compute_final_metrics(engine: Engine) -> None:
+        final_evaluator.run(val_loader)
 
     # -------------------- Handlers --------------------
     # -----------------------------------------------------
@@ -101,12 +120,16 @@ def run(hparams: HParams, dataset_conf: CC359Config, unet_conf: UNetConfig) -> N
         output_transform=lambda loss: {"batchloss": loss},
     )
 
-    for tag, evaluator in [("training", train_evaluator), ("validation", validation_evaluator)]:
+    for tag, evaluator, metr in [
+        ("training", train_evaluator, metrics),
+        ("validation", validation_evaluator, metrics),
+        ("subject_scores", final_evaluator, final_metrics),
+    ]:
         wandb_logger.attach_output_handler(
             evaluator,
             event_name=Events.EPOCH_COMPLETED,
             tag=tag,
-            metric_names=list(metrics.keys()),
+            metric_names=list(metr.keys()),
             global_step_transform=lambda *_: trainer.state.iteration,
         )
 
@@ -114,7 +137,10 @@ def run(hparams: HParams, dataset_conf: CC359Config, unet_conf: UNetConfig) -> N
 
     # score function used for model checkpoint
     def score_function(engine: Engine) -> None:
-        return engine.state.metrics["dice"].item()
+        if len(engine.state.metrics["dice"]) == 1:
+            return engine.state.metrics["dice"].item()
+        else:
+            return 0
 
     model_checkpoint = ModelCheckpoint(
         wandb_logger.run.dir,
@@ -131,6 +157,12 @@ def run(hparams: HParams, dataset_conf: CC359Config, unet_conf: UNetConfig) -> N
 
     # kick everything off
     trainer.run(train_loader, max_epochs=hparams.epochs)
+
+    # log mean value of surface dice
+    wandb.log(
+        {"validation/surface_dice": final_evaluator.state.metrics["surface_dice"].mean()},
+        step=trainer.state.get_event_attrib_value(Events.ITERATION_COMPLETED),
+    )
 
     wandb_logger.close()
 
