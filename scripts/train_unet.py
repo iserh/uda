@@ -32,7 +32,7 @@ def run(config_dir: Path, data_dir: Path) -> None:
 
     run = wandb.init(
         project="UDA",
-        name=f"U-Net Training",
+        name="U-Net Training",
         config={
             "hparams": hparams.__dict__,
             "dataset": dataset_conf.__dict__,
