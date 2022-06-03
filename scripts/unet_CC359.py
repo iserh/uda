@@ -24,19 +24,26 @@ def binary_one_hot_output_transform(output: Tuple[torch.Tensor, torch.Tensor]) -
     return y_pred, y.long()
 
 
-def run(hparams: HParams, dataset_conf: CC359Config, unet_conf: UNetConfig) -> None:
+def run(config_dir: Path, data_dir: Path) -> None:
+    # load configuration files
+    dataset_conf = CC359Config.from_file(config_dir / "cc359.yml")
+    unet_conf = UNetConfig.from_file(config_dir / "unet.yml")
+    hparams = HParams.from_file(config_dir / "hparams.yml")
+
     run = wandb.init(
         project="UDA",
-        name="CC359-UNet",
+        name=f"CC359-UNet{unet_conf.dim}D",
         config={
-            "hp": hparams.__dict__,
-            "ds": dataset_conf.__dict__,
-            "unet": unet_conf.__dict__,
+            "hparams": hparams.__dict__,
+            "dataset": dataset_conf.__dict__,
+            "model": unet_conf.__dict__,
         },
     )
 
+    run.save(str(config_dir / "*"), policy="now")
+
     cc359 = run.use_artifact("CC359-Skull-stripping:latest")
-    data_dir = cc359.download(root="/tmp/data/CC359")
+    data_dir = cc359.download(root=data_dir)
 
     train_dataset = CC359(data_dir, dataset_conf, train=True)
     val_dataset = CC359(data_dir, dataset_conf, train=False)
@@ -54,8 +61,8 @@ def run(hparams: HParams, dataset_conf: CC359Config, unet_conf: UNetConfig) -> N
     print(f"Using device: {device}")
 
     model.to(device)  # Move model before creating optimizer
-    optimizer = hparams.get_optim()(model.parameters(), lr=hparams.learning_rate)
-    criterion = hparams.get_criterion()
+    optimizer = hparams.get_optimizer()(model.parameters(), lr=hparams.learning_rate)
+    criterion = hparams.get_criterion()(hparams.square_dice_denom)
 
     # metrics
     cm = ConfusionMatrix(num_classes=2, output_transform=binary_one_hot_output_transform)
@@ -86,11 +93,6 @@ def run(hparams: HParams, dataset_conf: CC359Config, unet_conf: UNetConfig) -> N
 
     final_evaluator = create_supervised_evaluator(model, metrics=final_metrics, device=device)
     final_evaluator.logger = setup_logger("Final Evaluator")
-
-    # # test some things on startup
-    # @trainer.on(Events.STARTED)
-    # def start_up_hook(engine: Engine) -> None:
-    #     final_evaluator.run(val_loader)
 
     # evaluation callback
     @trainer.on(Events.EPOCH_COMPLETED)
@@ -172,9 +174,4 @@ if __name__ == "__main__":
     data_dir = Path("/tmp/data/CC359")
     config_dir = Path("config")
 
-    # load configuration files
-    dataset_conf = CC359Config.from_file(config_dir / "cc359.yml")
-    unet_conf = UNetConfig.from_file(config_dir / "unet.yml")
-    hparams = HParams.from_file(config_dir / "hparams.yml")
-
-    run(hparams, dataset_conf, unet_conf)
+    run(config_dir, data_dir)
