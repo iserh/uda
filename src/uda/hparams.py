@@ -57,4 +57,7 @@ class HParams(Config):
         return _Optimizer[self.optimizer].value
 
     def get_criterion(self) -> Type[nn.Module]:
-        return _LossCriterion[self.criterion].value
+        if self.criterion == LossCriterion.Dice:
+            return _LossCriterion[self.criterion].value(self.square_dice_denom)
+        else:
+            return _LossCriterion[self.criterion].value()

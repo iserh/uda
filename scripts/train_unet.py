@@ -63,7 +63,7 @@ def run(config_dir: Path, data_dir: Path) -> None:
 
     model.to(device)  # Move model before creating optimizer
     optimizer = hparams.get_optimizer()(model.parameters(), lr=hparams.learning_rate)
-    criterion = hparams.get_criterion()(hparams.square_dice_denom)
+    criterion = hparams.get_criterion()
 
     # metrics
     cm = ConfusionMatrix(num_classes=2, output_transform=binary_one_hot_output_transform)
