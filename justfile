@@ -15,9 +15,7 @@ setup-run-config:
 
 
 bg +cmd:
-    tmux new-session -s "bg-session" -d
-    tmux send-keys -t "bg-session" "just _bg {{cmd}}" Enter
-    tmux attach -t "bg-session"
+    tmux new-session -s "bg-session" "just _bg {{cmd}}"
 _bg +cmd:
     eval "$(conda shell.bash hook)" && \
     conda activate uda && \
