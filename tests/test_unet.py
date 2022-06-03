@@ -88,7 +88,7 @@ def test_unet_invalid_dimension(unet_config_default: UNetConfig) -> None:
     # change the default configuration
     unet_config_default.dim = 4
     # create model
-    with pytest.raises(ValueError):
+    with pytest.raises(Exception):
         UNet(unet_config_default)
 
 
@@ -116,15 +116,7 @@ def test_unet_invalid_backbone(unet_config_default: UNetConfig) -> None:
     # change the default configuration
     unet_config_default.encoder_backbone = "InvalidBackbone"
     # create model
-    with pytest.raises(ValueError):
-        UNet(unet_config_default)
-
-
-def test_bilinear_decoder(unet_config_default: UNetConfig) -> None:
-    # change the default configuration
-    unet_config_default.bilinear_upsampling = True
-    # create model
-    with pytest.raises(NotImplementedError):
+    with pytest.raises(Exception):
         UNet(unet_config_default)
 
 

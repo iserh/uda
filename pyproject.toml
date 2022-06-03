@@ -48,7 +48,7 @@ ensure_newline_before_comments = true
 line_length = 120
 
 [tool.pytest.ini_options]
-addopts = "-v --cov --cov-report=html --cov-report=term"
+addopts = "--cov --cov-report=html --cov-report=term"
 testpaths = "tests"
 
 [tool.coverage.run]
