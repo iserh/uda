@@ -41,6 +41,7 @@ def run(config_dir: Path, data_dir: Path) -> None:
     )
 
     run.save(str(config_dir / "*"), policy="now")
+    run.save(str(Path(__file__)), policy="now")
 
     cc359 = run.use_artifact("CC359-Skull-stripping:latest")
     data_dir = cc359.download(root=data_dir)
