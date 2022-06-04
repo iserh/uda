@@ -1,5 +1,6 @@
 from typing import Tuple
 
+import numpy as np
 import torch
 
 
@@ -33,3 +34,17 @@ def unpatchify(t: torch.Tensor, size: Tuple[int], start: int = 3, patch_dim: int
         t = torch.cat(t.split(1, patch_dim_end - i), dim=-i - 1)
     # squash patch dimensions
     return t.reshape(*t.shape[:patch_dim], *size)
+
+
+def reshape_to_volume(
+    data: torch.Tensor, orig_shape: Tuple[int, int, int], patch_dims: Tuple[int, int, int]
+) -> torch.Tensor:
+    if patch_dims is not None:
+        # move n_patches in seperate dimension
+        n_patches = [int(dim_size / patch_size) for patch_size, dim_size in zip(patch_dims, orig_shape)]
+        data = data.reshape(-1, np.prod(n_patches), *patch_dims)
+        # unpatchify
+        data = unpatchify(data, orig_shape, start=2)
+
+    # reshape to 3d volume
+    return data.reshape(-1, *orig_shape)

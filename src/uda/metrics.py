@@ -68,22 +68,9 @@ class SurfaceDice(EpochMetric):
         y_pred = y_pred.reshape(-1, *self.orig_shape)
         y_true = y_true.reshape(-1, *self.orig_shape)
 
-        iterator = (
-            tqdm(zip(y_pred, y_true, self.spacing_mm), total=len(y_pred), desc="Computing surface dice", leave=False)
-            if self.prog_bar
-            else zip(y_pred, y_true, self.spacing_mm)
-        )
+        sfdice_values = surface_dice(y_pred, y_true, self.spacing_mm, self.tolerance_mm, self.prog_bar)
 
-        surface_dice_vals = torch.Tensor(
-            [
-                compute_surface_dice_at_tolerance(
-                    compute_surface_distances(y_.bool().numpy(), y_pred_.bool().numpy(), spacing), self.tolerance_mm
-                )
-                for y_pred_, y_, spacing in iterator
-            ]
-        )
-
-        return surface_dice_vals.mean() if self.reduce_mean else surface_dice_vals
+        return sfdice_values.mean() if self.reduce_mean else sfdice_values
 
 
 def dice_score(y_pred: torch.Tensor, y_true: torch.Tensor, dim: int = 0, square_denom: bool = False) -> torch.Tensor:
@@ -98,6 +85,31 @@ def dice_score(y_pred: torch.Tensor, y_true: torch.Tensor, dim: int = 0, square_
         denom = y_pred.sum(dim) + y_true.sum(dim)
 
     return num / denom
+
+
+def surface_dice(
+    y_pred: torch.Tensor,
+    y_true: torch.Tensor,
+    spacing_mm: Tuple[int, int, int],
+    tolerance_mm: float,
+    prog_bar: bool = False,
+) -> torch.Tensor:
+    iterator = (
+        tqdm(zip(y_pred, y_true, spacing_mm), total=len(y_pred), desc="Computing surface dice", leave=False)
+        if prog_bar
+        else zip(y_pred, y_true, spacing_mm)
+    )
+
+    surface_dice_vals = torch.Tensor(
+        [
+            compute_surface_dice_at_tolerance(
+                compute_surface_distances(y_.bool().numpy(), y_pred_.bool().numpy(), spacing), tolerance_mm
+            )
+            for y_pred_, y_, spacing in iterator
+        ]
+    )
+
+    return surface_dice_vals
 
 
 def flatten_output(output: Tuple[torch.Tensor, torch.Tensor], dim: int = 0) -> None:

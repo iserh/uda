@@ -2,19 +2,23 @@ from pathlib import Path
 from typing import Tuple
 
 import ignite
+import numpy as np
 import torch
 import wandb
 from ignite.contrib.handlers.tqdm_logger import ProgressBar
 from ignite.contrib.handlers.wandb_logger import WandBLogger
 from ignite.engine import Engine, Events, create_supervised_evaluator, create_supervised_trainer
-from ignite.handlers import ModelCheckpoint, global_step_from_engine
+from ignite.handlers import EpochOutputStore, ModelCheckpoint
 from ignite.metrics import ConfusionMatrix, DiceCoefficient, Loss
 from ignite.utils import setup_logger
+from surface_distance import compute_surface_dice_at_tolerance, compute_surface_distances
 from torch.utils.data import DataLoader
+from tqdm import tqdm
 
 from uda import HParams, UNet, UNetConfig
 from uda.datasets import CC359, CC359Config
-from uda.metrics import EpochDice, SurfaceDice
+from uda.metrics import dice_score
+from uda.utils import reshape_to_volume
 
 
 def binary_one_hot_output_transform(output: Tuple[torch.Tensor, torch.Tensor]) -> Tuple[torch.Tensor, torch.Tensor]:
@@ -32,7 +36,8 @@ def run(config_dir: Path, data_dir: Path) -> None:
 
     run = wandb.init(
         project="UDA",
-        name="U-Net Training",
+        group="Dev",
+        name=f"UNet{unet_conf.dim}D-Source={dataset_conf.vendor}",
         config={
             "hparams": hparams.__dict__,
             "dataset": dataset_conf.__dict__,
@@ -41,7 +46,8 @@ def run(config_dir: Path, data_dir: Path) -> None:
     )
 
     run.save(str(config_dir / "*"), policy="now")
-    run.save(str(Path(__file__)), policy="now")
+    # run.save(str(Path(__file__)), policy="now")
+    run.log_code()
 
     cc359 = run.use_artifact("CC359-Skull-stripping:latest")
     data_dir = cc359.download(root=data_dir)
@@ -69,18 +75,6 @@ def run(config_dir: Path, data_dir: Path) -> None:
     cm = ConfusionMatrix(num_classes=2, output_transform=binary_one_hot_output_transform)
     metrics = {"dice": DiceCoefficient(cm, ignore_index=0), "loss": Loss(criterion)}
 
-    final_metrics = {
-        "dice": EpochDice(reduce_mean=False, orig_shape=val_dataset.PADDING_SHAPE, patch_dims=val_dataset.patch_dims),
-        "surface_dice": SurfaceDice(
-            reduce_mean=False,
-            orig_shape=val_dataset.PADDING_SHAPE,
-            patch_dims=val_dataset.patch_dims,
-            spacing_mm=val_dataset.spacing_mm,
-            tolerance_mm=hparams.sdice_tolerance,
-            prog_bar=True,
-        ),
-    }
-
     # -------------------- trainer & evaluators --------------------
 
     trainer = create_supervised_trainer(model, optimizer, criterion, device=device)
@@ -92,8 +86,11 @@ def run(config_dir: Path, data_dir: Path) -> None:
     validation_evaluator = create_supervised_evaluator(model, metrics=metrics, device=device)
     validation_evaluator.logger = setup_logger("Val Evaluator")
 
-    final_evaluator = create_supervised_evaluator(model, metrics=final_metrics, device=device)
+    final_evaluator = create_supervised_evaluator(model, device=device)
     final_evaluator.logger = setup_logger("Final Evaluator")
+    # gather outputs in final evaluation for visualization
+    eos = EpochOutputStore()
+    eos.attach(final_evaluator, "output")
 
     # evaluation callback
     @trainer.on(Events.EPOCH_COMPLETED)
@@ -105,6 +102,49 @@ def run(config_dir: Path, data_dir: Path) -> None:
     @trainer.on(Events.COMPLETED)
     def compute_final_metrics(engine: Engine) -> None:
         final_evaluator.run(val_loader)
+
+        y_pred, y_true = [*zip(*final_evaluator.state.output)]
+
+        y_pred = torch.cat(y_pred).round().cpu()
+        y_true = torch.cat(y_true).cpu()
+
+        y_pred = reshape_to_volume(y_pred, val_dataset.PADDING_SHAPE, val_dataset.patch_dims)
+        y_true = reshape_to_volume(y_true, val_dataset.PADDING_SHAPE, val_dataset.patch_dims)
+        data = reshape_to_volume(val_dataset.data, val_dataset.PADDING_SHAPE, val_dataset.patch_dims)
+
+        class_labels = {1: "Skull"}
+        slice_index = val_dataset.PADDING_SHAPE[0] // 2
+
+        table = wandb.Table(columns=["ID", "Dice", "Surface Dice", "Image"])
+
+        # iterate over subjects
+        subject_data = zip(y_pred, y_true, data, val_dataset.spacing_mm)
+        for i, (y_pred_subj, y_true_subj, data_subj, spacing_mm) in tqdm(
+            enumerate(subject_data), total=len(y_pred), desc="Final Evaluation Metric Computing", leave=False
+        ):
+            dice = dice_score(y_pred_subj, y_true_subj)
+            surface_dice = compute_surface_dice_at_tolerance(
+                compute_surface_distances(y_true_subj.bool().numpy(), y_pred_subj.bool().numpy(), spacing_mm),
+                tolerance_mm=hparams.sdice_tolerance,
+            )
+
+            # the raw background image as a numpy array
+            data_subj = (data_subj[slice_index] * 255).numpy().astype(np.uint8)
+            y_pred_subj = y_pred_subj[slice_index].numpy().astype(np.uint8)
+            y_true_subj = y_true_subj[slice_index].numpy().astype(np.uint8)
+
+            wandb_img = wandb.Image(
+                data_subj,
+                masks={
+                    "prediction": {"mask_data": y_pred_subj, "class_labels": class_labels},
+                    "ground truth": {"mask_data": y_true_subj, "class_labels": class_labels},
+                },
+            )
+
+            table.add_data(i, dice, surface_dice, wandb_img)
+
+        surface_dice_mean = np.array(table.get_column("Surface Dice")).mean()
+        wandb.log({"Segmentation": table, "validation/surface_dice": surface_dice_mean})
 
     # -------------------- Handlers --------------------
     # -----------------------------------------------------
@@ -123,11 +163,7 @@ def run(config_dir: Path, data_dir: Path) -> None:
         output_transform=lambda loss: {"batchloss": loss},
     )
 
-    for tag, evaluator, metr in [
-        ("training", train_evaluator, metrics),
-        ("validation", validation_evaluator, metrics),
-        ("subject_scores", final_evaluator, final_metrics),
-    ]:
+    for tag, evaluator, metr in [("training", train_evaluator, metrics), ("validation", validation_evaluator, metrics)]:
         wandb_logger.attach_output_handler(
             evaluator,
             event_name=Events.EPOCH_COMPLETED,
@@ -148,10 +184,8 @@ def run(config_dir: Path, data_dir: Path) -> None:
     model_checkpoint = ModelCheckpoint(
         wandb_logger.run.dir,
         n_saved=1,
-        filename_prefix="best",
         score_function=score_function,
-        score_name="validation_dice",
-        global_step_transform=global_step_from_engine(trainer),
+        filename_pattern="best_model",
     )
 
     validation_evaluator.add_event_handler(Events.COMPLETED, model_checkpoint, {"model": model})
@@ -160,12 +194,6 @@ def run(config_dir: Path, data_dir: Path) -> None:
 
     # kick everything off
     trainer.run(train_loader, max_epochs=hparams.epochs)
-
-    # log mean value of surface dice
-    wandb.log(
-        {"validation/surface_dice": final_evaluator.state.metrics["surface_dice"].mean()},
-        step=trainer.state.get_event_attrib_value(Events.ITERATION_COMPLETED),
-    )
 
     wandb_logger.close()
 
