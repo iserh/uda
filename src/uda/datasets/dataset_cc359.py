@@ -73,7 +73,9 @@ class CC359(Dataset):
         data_path = Path(data_path)
 
         images_dir = data_path / "Original" / self.vendor
-        files = list(images_dir.glob("*.nii.gz"))
+        # sorted is absolutely crucial here:
+        # we cannot expect that files are downloaded in the same order on each system
+        files = sorted(list(images_dir.glob("*.nii.gz")))
         if self.fold is not None:
             files = self.select_fold(files)
 
