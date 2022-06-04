@@ -143,7 +143,7 @@ def run(config_dir: Path, data_dir: Path) -> None:
             table.add_data(i, dice, surface_dice, wandb_img)
 
         surface_dice_mean = np.array(table.get_column("Surface Dice")).mean()
-        wandb.log({"Segmentation": table, "validation/surface_dice": surface_dice_mean})
+        run.log({"Segmentation": table, "validation/surface_dice": surface_dice_mean})
 
     # -------------------- Handlers --------------------
     # -----------------------------------------------------
