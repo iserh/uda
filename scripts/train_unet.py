@@ -36,7 +36,7 @@ def run(config_dir: Path, data_dir: Path) -> None:
 
     run = wandb.init(
         project="UDA",
-        group="Dev",
+        group="Benchmark",
         name=f"UNet{unet_conf.dim}D-Source={dataset_conf.vendor}",
         config={
             "hparams": hparams.__dict__,
