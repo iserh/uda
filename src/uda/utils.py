@@ -4,6 +4,22 @@ import numpy as np
 import torch
 
 
+def is_notebook() -> bool:
+    try:
+        import os
+
+        from IPython import get_ipython
+
+        if "IPKernelApp" not in get_ipython().config:  # pragma: no cover
+            raise ImportError("console")
+        if "VSCODE_PID" in os.environ:  # pragma: no cover
+            raise ImportError("vscode")
+    except ImportError:
+        return False
+    else:  # pragma: no cover
+        return True
+
+
 def patchify(t: torch.Tensor, size: Tuple[int], start: int = 2) -> torch.Tensor:
     """Args:
     `t` : Tensor to patchify

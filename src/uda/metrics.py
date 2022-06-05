@@ -4,9 +4,13 @@ import numpy as np
 import torch
 from ignite.metrics import EpochMetric
 from surface_distance import compute_surface_dice_at_tolerance, compute_surface_distances
-from tqdm import tqdm
 
-from .utils import unpatchify
+from .utils import is_notebook, unpatchify
+
+if is_notebook():
+    from tqdm.notebook import tqdm
+else:
+    from tqdm import tqdm
 
 
 class EpochDice(EpochMetric):
@@ -88,16 +92,16 @@ def dice_score(y_pred: torch.Tensor, y_true: torch.Tensor, dim: int = 0, square_
 
 
 def surface_dice(
-    y_pred: torch.Tensor,
-    y_true: torch.Tensor,
-    spacing_mm: Tuple[int, int, int],
+    preds: torch.Tensor,
+    targets: torch.Tensor,
+    spacings_mm: torch.Tensor,
     tolerance_mm: float,
     prog_bar: bool = False,
 ) -> torch.Tensor:
     iterator = (
-        tqdm(zip(y_pred, y_true, spacing_mm), total=len(y_pred), desc="Computing surface dice", leave=False)
+        tqdm(zip(preds, targets, spacings_mm), total=len(preds), desc="Computing surface dice", leave=False)
         if prog_bar
-        else zip(y_pred, y_true, spacing_mm)
+        else zip(preds, targets, spacings_mm)
     )
 
     surface_dice_vals = torch.Tensor(

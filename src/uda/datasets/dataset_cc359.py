@@ -9,7 +9,13 @@ from nibabel.spatialimages import SpatialImage
 from sklearn.model_selection import KFold
 from sklearn.preprocessing import MinMaxScaler
 from torch.utils.data import Dataset
-from tqdm import tqdm
+
+from uda.utils import is_notebook
+
+if is_notebook():
+    from tqdm.notebook import tqdm
+else:
+    from tqdm import tqdm
 
 from uda.utils import patchify
 
