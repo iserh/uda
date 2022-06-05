@@ -102,14 +102,14 @@ def run(config_dir: Path, data_dir: Path) -> None:
     def compute_final_metrics(engine: Engine) -> None:
         final_evaluator.run(val_loader)
 
-        y_pred, y_true = [*zip(*final_evaluator.state.output)]
+        preds, targets = [*zip(*final_evaluator.state.output)]
 
-        y_pred = torch.cat(y_pred).round().cpu()
-        y_true = torch.cat(y_true).cpu()
+        preds = torch.cat(preds).round().cpu()
+        targets = torch.cat(targets).cpu()
 
-        y_pred = reshape_to_volume(y_pred, val_dataset.PADDING_SHAPE, val_dataset.patch_dims)
-        y_true = reshape_to_volume(y_true, val_dataset.PADDING_SHAPE, val_dataset.patch_dims)
-        data = reshape_to_volume(val_dataset.data, val_dataset.PADDING_SHAPE, val_dataset.patch_dims)
+        preds = reshape_to_volume(preds, val_dataset.PADDING_SHAPE, val_dataset.patch_dims)
+        targets = reshape_to_volume(targets, val_dataset.PADDING_SHAPE, val_dataset.patch_dims)
+        inputs = reshape_to_volume(val_dataset.data, val_dataset.PADDING_SHAPE, val_dataset.patch_dims)
 
         class_labels = {1: "Skull"}
         slice_index = val_dataset.PADDING_SHAPE[0] // 2
@@ -117,33 +117,40 @@ def run(config_dir: Path, data_dir: Path) -> None:
         table = wandb.Table(columns=["ID", "Dice", "Surface Dice", "Image"])
 
         # iterate over subjects
-        subject_data = zip(y_pred, y_true, data, val_dataset.spacing_mm)
-        for i, (y_pred_subj, y_true_subj, data_subj, spacing_mm) in tqdm(
-            enumerate(subject_data), total=len(y_pred), desc="Final Evaluation Metric Computing", leave=False
+        subject_data = zip(preds, targets, inputs, val_dataset.spacing_mm)
+        for i, (y_pred, y_true, data, spacing_mm) in tqdm(
+            enumerate(subject_data), total=len(preds), desc="Final Evaluation Metric Computing", leave=False
         ):
-            dice = dice_score(y_pred_subj, y_true_subj)
+            dice = dice_score(y_pred, y_true)
             surface_dice = compute_surface_dice_at_tolerance(
-                compute_surface_distances(y_true_subj.bool().numpy(), y_pred_subj.bool().numpy(), spacing_mm),
+                compute_surface_distances(y_true.bool().numpy(), y_pred.bool().numpy(), spacing_mm),
                 tolerance_mm=hparams.sdice_tolerance,
             )
 
             # the raw background image as a numpy array
-            data_subj = (data_subj[slice_index] * 255).numpy().astype(np.uint8)
-            y_pred_subj = y_pred_subj[slice_index].numpy().astype(np.uint8)
-            y_true_subj = y_true_subj[slice_index].numpy().astype(np.uint8)
+            data = (data[slice_index] * 255).numpy().astype(np.uint8)
+            y_pred = y_pred[slice_index].numpy().astype(np.uint8)
+            y_true = y_true[slice_index].numpy().astype(np.uint8)
+
+            # rotate images & masks
+            data = np.rot90(data, k=2)
+            y_pred = np.rot90(y_pred, k=2)
+            y_true = np.rot90(y_true, k=2)
 
             wandb_img = wandb.Image(
-                data_subj,
+                data,
                 masks={
-                    "prediction": {"mask_data": y_pred_subj, "class_labels": class_labels},
-                    "ground truth": {"mask_data": y_true_subj, "class_labels": class_labels},
+                    "prediction": {"mask_data": y_pred, "class_labels": class_labels},
+                    "ground truth": {"mask_data": y_true, "class_labels": class_labels},
                 },
             )
 
             table.add_data(i, dice, surface_dice, wandb_img)
 
         surface_dice_mean = np.array(table.get_column("Surface Dice")).mean()
+
         run.log({"Segmentation": table, "validation/surface_dice": surface_dice_mean})
+        wandb.run.summary["validation/surface_dice"] = surface_dice_mean
 
     # -------------------- Handlers --------------------
     # -----------------------------------------------------

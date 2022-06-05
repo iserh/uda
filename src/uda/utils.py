@@ -14,7 +14,7 @@ def is_notebook() -> bool:
             raise ImportError("console")
         if "VSCODE_PID" in os.environ:  # pragma: no cover
             raise ImportError("vscode")
-    except ImportError:
+    except Exception:
         return False
     else:  # pragma: no cover
         return True
