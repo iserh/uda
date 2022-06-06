@@ -36,8 +36,8 @@ class HParams(Config):
     `learning_rate` : Learning rate
     `train_batch_size`: Batch Size for training
     `train_batch_size`: Batch Size for validation
-    `sdice_tolerance`: Tolerance value for surface dice
-    `square_dice_denom`: Square the denominator when using dice loss. Defaults to `True`
+    `sf_dice_tolerance`: Tolerance value for surface dice
+    `dice_pow`: Square the denominator when using dice loss. Defaults to `True`
     """
 
     epochs: int = 10
@@ -46,18 +46,18 @@ class HParams(Config):
     learning_rate: float = 1e-4
     train_batch_size: int = 4
     val_batch_size: int = 4
-    sdice_tolerance: float = 0.5
-    square_dice_denom: Optional[bool] = None
+    sf_dice_tolerance: float = 0.5
+    dice_pow: Optional[bool] = None
 
     def __post_init__(self) -> None:
-        if self.square_dice_denom is None and self.criterion == LossCriterion.Dice:
-            self.square_dice_denom = True
+        if self.dice_pow is None and self.criterion == LossCriterion.Dice:
+            self.dice_pow = True
 
     def get_optimizer(self) -> Type[torch.optim.Optimizer]:
         return _Optimizer[self.optimizer].value
 
     def get_criterion(self) -> Type[nn.Module]:
         if self.criterion == LossCriterion.Dice:
-            return _LossCriterion[self.criterion].value(self.square_dice_denom)
+            return _LossCriterion[self.criterion].value(self.dice_pow)
         else:
             return _LossCriterion[self.criterion].value()

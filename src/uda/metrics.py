@@ -1,11 +1,11 @@
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Union
 
 import numpy as np
 import torch
 from ignite.metrics import EpochMetric
 from surface_distance import compute_surface_dice_at_tolerance, compute_surface_distances
 
-from .utils import is_notebook, unpatchify
+from .utils import flatten_output_transform, is_notebook, reshape_to_volume
 
 if is_notebook():
     from tqdm.notebook import tqdm
@@ -13,109 +13,102 @@ else:
     from tqdm import tqdm
 
 
-class EpochDice(EpochMetric):
+class DiceScore(EpochMetric):
     def __init__(
         self,
-        orig_shape: Tuple[int, int, int],
+        imsize: Tuple[int, int, int],
+        patch_size: Optional[Tuple[int, int, int]] = None,
         reduce_mean: bool = True,
-        patch_dims: Optional[Tuple[int, int, int]] = None,
         check_compute_fn: bool = False,
     ) -> None:
-        super(EpochDice, self).__init__(self.compute_fn, flatten_output, check_compute_fn)
-        self.orig_shape = orig_shape
+        super(DiceScore, self).__init__(self.compute_fn, flatten_output_transform, check_compute_fn)
+        self.imsize = imsize
+        self.patch_size = patch_size
         self.reduce_mean = reduce_mean
-        self.patch_dims = patch_dims
 
     def compute_fn(self, y_pred: torch.Tensor, y_true: torch.Tensor) -> torch.Tensor:
-        if self.patch_dims is not None:
-            # move n_patches in seperate dimension
-            n_patches = [int(s / pd) for pd, s in zip(self.patch_dims, self.orig_shape)]
-            y_pred = y_pred.reshape(-1, np.prod(n_patches), *self.patch_dims)
-            # unpatchify
-            y_pred = unpatchify(y_pred, self.orig_shape, start=2)
+        y_pred = reshape_to_volume(y_pred, self.imsize, self.patch_size)
+        y_true = reshape_to_volume(y_true, self.imsize, self.patch_size)
 
-        # reshape to 3d volume
-        y_pred = y_pred.reshape(-1, *self.orig_shape)
-        y_true = y_true.reshape(-1, *self.orig_shape)
-
-        return dice_score(y_pred, y_true, 0 if self.reduce_mean else 1)
+        return dice_score(y_pred, y_true, axis=1 if self.reduce_mean else 0)
 
 
 class SurfaceDice(EpochMetric):
     def __init__(
         self,
-        spacing_mm: torch.Tensor,
+        spacings_mm: torch.Tensor,
         tolerance_mm: float,
-        orig_shape: Tuple[int, int, int],
+        imsize: Tuple[int, int, int],
+        patch_size: Optional[Tuple[int, int, int]] = None,
         reduce_mean: bool = True,
-        patch_dims: Optional[Tuple[int, int, int]] = None,
+        prog_bar: bool = True,
         check_compute_fn: bool = False,
-        prog_bar: bool = False,
     ) -> None:
-        super(SurfaceDice, self).__init__(self.compute_fn, flatten_output, check_compute_fn)
-        self.spacing_mm = spacing_mm
+        super(SurfaceDice, self).__init__(self.compute_fn, flatten_output_transform, check_compute_fn)
+        self.spacings_mm = spacings_mm
         self.tolerance_mm = tolerance_mm
-        self.orig_shape = orig_shape
+        self.imsize = imsize
+        self.patch_size = patch_size
         self.reduce_mean = reduce_mean
-        self.patch_dims = patch_dims
         self.prog_bar = prog_bar
 
     def compute_fn(self, y_pred: torch.Tensor, y_true: torch.Tensor) -> torch.Tensor:
-        if self.patch_dims is not None:
-            # move n_patches in seperate dimension
-            n_patches = [int(s / pd) for pd, s in zip(self.patch_dims, self.orig_shape)]
-            y_pred = y_pred.reshape(-1, np.prod(n_patches), *self.patch_dims)
-            # unpatchify
-            y_pred = unpatchify(y_pred, self.orig_shape, start=2)
+        y_pred = reshape_to_volume(y_pred, self.imsize, self.patch_size)
+        y_true = reshape_to_volume(y_true, self.imsize, self.patch_size)
 
-        # reshape to 3d volume
-        y_pred = y_pred.reshape(-1, *self.orig_shape)
-        y_true = y_true.reshape(-1, *self.orig_shape)
+        sf_dice_vals = surface_dice(y_pred, y_true, self.spacings_mm, self.tolerance_mm, self.prog_bar)
 
-        sfdice_values = surface_dice(y_pred, y_true, self.spacing_mm, self.tolerance_mm, self.prog_bar)
-
-        return sfdice_values.mean() if self.reduce_mean else sfdice_values
+        return sf_dice_vals.mean() if self.reduce_mean else sf_dice_vals
 
 
-def dice_score(y_pred: torch.Tensor, y_true: torch.Tensor, dim: int = 0, square_denom: bool = False) -> torch.Tensor:
-    y_pred = y_pred.flatten(dim)
-    y_true = y_true.flatten(dim)
+def dice_score(
+    y_pred: Union[np.ndarray, torch.Tensor], y_true: Union[np.ndarray, torch.Tensor], axis: int = 0, pow: bool = False
+) -> Union[np.ndarray, torch.Tensor]:
+    # flatten
+    y_pred = y_pred.reshape(*y_pred.shape[:axis], -1)
+    y_true = y_true.reshape(*y_true.shape[:axis], -1)
 
-    num = 2 * (y_pred * y_true).sum(dim)
+    num = 2 * (y_pred * y_true).sum(axis)
 
-    if square_denom:
-        denom = y_pred.pow(2).sum(dim) + y_true.pow(2).sum(dim)
+    if pow:
+        denom = (y_pred**2).sum(axis) + (y_true**2).sum(axis)
     else:
-        denom = y_pred.sum(dim) + y_true.sum(dim)
+        denom = y_pred.sum(axis) + y_true.sum(axis)
 
     return num / denom
 
 
 def surface_dice(
-    preds: torch.Tensor,
-    targets: torch.Tensor,
-    spacings_mm: torch.Tensor,
+    preds: Union[np.ndarray, torch.Tensor],
+    targets: Union[np.ndarray, torch.Tensor],
+    spacings_mm: Union[np.ndarray, torch.Tensor],
     tolerance_mm: float,
-    prog_bar: bool = False,
-) -> torch.Tensor:
+    prog_bar: bool = True,
+) -> Union[np.ndarray, torch.Tensor]:
+    # check if torch.Tensor (surface-distance uses numpy backend)
+    if isinstance(preds, torch.Tensor):
+        preds = preds.numpy()
+        output_type_tensor = True
+    else:
+        output_type_tensor = False
+    if isinstance(preds, torch.Tensor):
+        targets = targets.numpy()
+    if isinstance(preds, torch.Tensor):
+        spacings_mm = spacings_mm.numpy()
+
     iterator = (
         tqdm(zip(preds, targets, spacings_mm), total=len(preds), desc="Computing surface dice", leave=False)
         if prog_bar
         else zip(preds, targets, spacings_mm)
     )
 
-    surface_dice_vals = torch.Tensor(
+    sf_dice_vals = np.array(
         [
             compute_surface_dice_at_tolerance(
-                compute_surface_distances(y_.bool().numpy(), y_pred_.bool().numpy(), spacing), tolerance_mm
+                compute_surface_distances(y_true.astype(bool), y_pred_.astype(bool), spacing_mm), tolerance_mm
             )
-            for y_pred_, y_, spacing in iterator
+            for y_pred_, y_true, spacing_mm in iterator
         ]
     )
 
-    return surface_dice_vals
-
-
-def flatten_output(output: Tuple[torch.Tensor, torch.Tensor], dim: int = 0) -> None:
-    y_pred, y_true = output
-    return y_pred.round().long().flatten(dim), y_true.flatten(dim)
+    return torch.from_numpy(sf_dice_vals) if output_type_tensor else sf_dice_vals

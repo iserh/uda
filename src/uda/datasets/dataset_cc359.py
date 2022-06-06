@@ -4,7 +4,6 @@ from typing import List, Tuple
 
 import nibabel as nib
 import numpy as np
-import torch
 from nibabel.spatialimages import SpatialImage
 from sklearn.model_selection import KFold
 from sklearn.preprocessing import MinMaxScaler
@@ -17,7 +16,7 @@ if is_notebook():
 else:
     from tqdm import tqdm
 
-from uda.utils import patchify
+from patchify import patchify
 
 from .configuration_cc359 import CC359Config
 
@@ -27,7 +26,7 @@ class CC359(Dataset):
 
     PADDING_SHAPE = (192, 256, 256)
 
-    def __init__(self, data_path: str, config: CC359Config, train: bool = True) -> None:
+    def __init__(self, data_path: str, config: CC359Config, train: bool = False) -> None:
         """Args:
         `data_path` : Dataset location
         `config` : CC359Config
@@ -37,8 +36,7 @@ class CC359(Dataset):
         self.fold = config.fold
         self.rotate = config.rotate
         self.flatten = config.flatten
-        self.patch_dims = config.patch_dims
-        self.flatten_patches = config.flatten_patches
+        self.patch_size = config.patch_size
         self.clip_intensities = config.clip_intensities
         self.random_state = config.random_state
         self.load_files(data_path)
@@ -89,14 +87,14 @@ class CC359(Dataset):
 
         scaler = MinMaxScaler()
 
-        images, labels, spacing_mm = [], [], []
+        images, labels, spacings_mm = [], [], []
         for file in tqdm(files, desc="Loading files"):
             nib_img: SpatialImage = nib.load(file)
             img = nib_img.get_fdata("unchanged", dtype=np.float32)
 
             label_path = data_path / "Silver-standard" / self.vendor / (file.name[:-7] + "_ss.nii.gz")
             nib_label: SpatialImage = nib.load(label_path)
-            label = nib_label.get_fdata("unchanged", dtype=np.float32)
+            targets = nib_label.get_fdata("unchanged", dtype=np.float32)
 
             # clip & scale the images
             if self.clip_intensities is not None:
@@ -105,51 +103,45 @@ class CC359(Dataset):
 
             if self.rotate is not None:
                 img = np.rot90(img, k=self.rotate, axes=(1, 2))
-                label = np.rot90(label, k=self.rotate, axes=(1, 2))
+                targets = np.rot90(targets, k=self.rotate, axes=(1, 2))
 
             # pad the images
             img = self.pad_array(img)
-            label = self.pad_array(label)
+            targets = self.pad_array(targets)
 
             images.append(img)
-            labels.append(label)
-            spacing_mm.append(np.array(nib_img.header.get_zooms()))
+            labels.append(targets)
+            spacings_mm.append(np.array(nib_img.header.get_zooms()))
 
-        # stack and convert to torch tensors
-        data = torch.from_numpy(np.stack(images))
-        label = torch.from_numpy(np.stack(labels))
-        spacing_mm = torch.from_numpy(np.stack(spacing_mm))
-
-        if self.flatten:
-            data = data.reshape(-1, *data.shape[-2:])
-            label = label.reshape(-1, *label.shape[-2:])
-
-        # add channel dimension
-        data = data.unsqueeze(1)
-        label = label.unsqueeze(1)
+        data = np.stack(images)
+        targets = np.stack(labels)
+        spacings_mm = np.stack(spacings_mm)
+        self.imsize = self.PADDING_SHAPE
 
         # patchify the data
-        if self.patch_dims is not None:
-            data = patchify(data, self.patch_dims)
-            label = patchify(label, self.patch_dims)
-            self.n_patches = data.shape[2 : 2 + len(self.patch_dims)]
+        if self.patch_size is not None:
+            data = patchify(data.reshape(-1, *data.shape[-2:]), self.patch_size, self.patch_size)
+            targets = patchify(targets.reshape(-1, *data.shape[-2:]), self.patch_size, self.patch_size)
 
-            if self.flatten_patches:
-                data = data.reshape(-1, 1, *self.patch_dims)
-                label = label.reshape(-1, 1, *self.patch_dims)
-            else:
-                data = data.reshape(data.shape[0], -1, 1, *self.patch_dims)
-                label = label.reshape(label.shape[0], -1, 1, *self.patch_dims)
+            # flatten the patches
+            data = data.reshape(-1, *self.patch_size)
+            targets = targets.reshape(-1, *self.patch_size)
 
-        self.data = data
-        self.label = label
-        self.spacing_mm = spacing_mm
+        # flatten 3d volumes to 2d images
+        if self.flatten:
+            data = data.reshape(-1, *data.shape[-2:])
+            targets = targets.reshape(-1, *targets.shape[-2:])
+
+        self.spacings_mm = spacings_mm
+        # add channel dimension
+        self.data = np.expand_dims(data, 1)
+        self.targets = np.expand_dims(targets, 1)
 
     def __len__(self) -> int:
         return len(self.data)
 
-    def __getitem__(self, idx: int) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    def __getitem__(self, idx: int) -> Tuple[np.ndarray, np.ndarray]:
         data = self.data[idx]
-        labels = self.label[idx]
+        labels = self.targets[idx]
 
         return data, labels
