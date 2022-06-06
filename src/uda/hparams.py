@@ -1,6 +1,6 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
-from typing import Optional, Type
+from typing import Any, Dict, Optional, Type
 
 import torch
 import torch.nn as nn
@@ -13,6 +13,7 @@ class LossCriterion(str, Enum):
     """Supported loss functions."""
 
     Dice = _LossCriterion.Dice.name
+    DiceBCE = _LossCriterion.DiceBCE.name
     BCE = _LossCriterion.BCE.name
 
 
@@ -44,20 +45,13 @@ class HParams(Config):
     criterion: LossCriterion = LossCriterion.BCE
     optimizer: Optimizer = Optimizer.Adam
     learning_rate: float = 1e-4
-    train_batch_size: int = 4
-    val_batch_size: int = 4
-    sf_dice_tolerance: float = 0.5
-    dice_pow: Optional[bool] = None
-
-    def __post_init__(self) -> None:
-        if self.dice_pow is None and self.criterion == LossCriterion.Dice:
-            self.dice_pow = True
+    train_batch_size: int = 1
+    val_batch_size: int = 1
+    loss_kwargs: Optional[Dict[str, Any]] = field(default_factory=dict)
+    sf_dice_tolerance: float = 1
 
     def get_optimizer(self) -> Type[torch.optim.Optimizer]:
         return _Optimizer[self.optimizer].value
 
     def get_criterion(self) -> Type[nn.Module]:
-        if self.criterion == LossCriterion.Dice:
-            return _LossCriterion[self.criterion].value(self.dice_pow)
-        else:
-            return _LossCriterion[self.criterion].value()
+        return _LossCriterion[self.criterion].value(self.loss_kwargs)

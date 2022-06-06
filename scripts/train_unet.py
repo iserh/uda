@@ -16,6 +16,7 @@ from tqdm import tqdm
 
 from uda import HParams, UNet, UNetConfig
 from uda.datasets import CC359, CC359Config
+from uda.hparams import LossCriterion
 from uda.metrics import dice_score
 from uda.utils import binary_one_hot_output_transform, reshape_to_volume
 
@@ -26,11 +27,11 @@ def run(config_dir: Path, data_dir: Path, tags: List[str]) -> None:
     unet_config: UNetConfig = UNetConfig.from_file(config_dir / "unet.yaml")
     hparams: HParams = HParams.from_file(config_dir / "hparams.yaml")
 
+    run_name = f"UNet-{unet_config.dim}D-Source={dataset_config.vendor}"
     run = wandb.init(
         project=f"UDA-{CC359.__name__}",
         tags=tags,
-        name=f"UNet-{unet_config.dim}D-Source={dataset_config.vendor}",
-        # name=f"UNet-{unet_config.dim}D-{hparams.criterion}-SD={hparams.dice_pow}",
+        name=run_name,
         config={
             "hparams": hparams.__dict__,
             "dataset": dataset_config.__dict__,

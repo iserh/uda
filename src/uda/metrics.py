@@ -62,18 +62,14 @@ class SurfaceDice(EpochMetric):
 
 
 def dice_score(
-    y_pred: Union[np.ndarray, torch.Tensor], y_true: Union[np.ndarray, torch.Tensor], axis: int = 0, pow: bool = False
+    y_pred: Union[np.ndarray, torch.Tensor], y_true: Union[np.ndarray, torch.Tensor], axis: int = 0
 ) -> Union[np.ndarray, torch.Tensor]:
     # flatten
     y_pred = y_pred.reshape(*y_pred.shape[:axis], -1)
     y_true = y_true.reshape(*y_true.shape[:axis], -1)
 
     num = 2 * (y_pred * y_true).sum(axis)
-
-    if pow:
-        denom = (y_pred**2).sum(axis) + (y_true**2).sum(axis)
-    else:
-        denom = y_pred.sum(axis) + y_true.sum(axis)
+    denom = y_pred.sum(axis) + y_true.sum(axis)
 
     return num / denom
 
