@@ -215,4 +215,4 @@ if __name__ == "__main__":
     config_dir = Path("config")
 
     run_id = run(config_dir, data_dir, tags=args.tags)
-    cross_evaluate_run(run_id)
+    # cross_evaluate_run(run_id)
