@@ -149,7 +149,7 @@ def run(config_dir: Path, data_dir: Path) -> None:
 
         surface_dice_mean = np.array(table.get_column("Surface Dice")).mean()
 
-        run.log({"Segmentation": table, "validation/surface_dice": surface_dice_mean})
+        run.log({"Segmentation": table})
         wandb.run.summary["validation/surface_dice"] = surface_dice_mean
 
     # -------------------- Handlers --------------------
@@ -203,10 +203,15 @@ def run(config_dir: Path, data_dir: Path) -> None:
 
     wandb_logger.close()
 
+    return run.id
+
 
 if __name__ == "__main__":
+    from cross_evaluate_run import cross_evaluate_run
+
     # directories
     data_dir = Path("/tmp/data/CC359")
     config_dir = Path("config")
 
-    run(config_dir, data_dir)
+    run_id = run(config_dir, data_dir)
+    cross_evaluate_run(run_id)

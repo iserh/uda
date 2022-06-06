@@ -60,18 +60,20 @@ class CC359(Dataset):
         if arr.shape[0] > depth:
             z = (int(np.floor((arr.shape[0] - depth) / 2)), int(np.ceil((arr.shape[0] - depth) / 2)))
             arr = arr[z[0] : -z[1]]
-        elif arr.shape[1] > width:
+        if arr.shape[1] > width:
             x = (int(np.floor((arr.shape[1] - width) / 2)), int(np.ceil((arr.shape[1] - width) / 2)))
             arr = arr[:, x[0] : -x[1]]
-        elif arr.shape[2] > height:
+        if arr.shape[2] > height:
             y = (int(np.floor((arr.shape[2] - height) / 2)), int(np.ceil((arr.shape[2] - height) / 2)))
             arr = arr[:, :, y[0] : -y[1]]
 
         # pad image
-        if arr.shape[0] < depth or arr.shape[1] < width or arr.shape[2] < height:
-            arr = np.pad(
-                arr, ((0, depth - arr.shape[0]), (0, width - arr.shape[1]), (0, height - arr.shape[2])), mode=mode
-            )
+        if arr.shape[0] < depth:
+            arr = np.pad(arr, ((0, depth - arr.shape[0]), (0, 0), (0, 0)), mode=mode)
+        if arr.shape[1] < width:
+            arr = np.pad(arr, ((0, 0), (0, width - arr.shape[1]), (0, 0)), mode=mode)
+        if arr.shape[2] < height:
+            arr = np.pad(arr, ((0, 0), (0, 0), (0, height - arr.shape[2])), mode=mode)
 
         return arr
 
