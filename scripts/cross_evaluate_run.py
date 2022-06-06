@@ -44,7 +44,14 @@ def cross_evaluate_run(
         model.eval().to(device)
 
         with torch.no_grad():
-            preds, targets = [*zip(*[(model(x.to(device)).sigmoid().cpu(), y_true) for x, y_true in tqdm(data_loader, desc="Predicting")])]
+            preds, targets = [
+                *zip(
+                    *[
+                        (model(x.to(device)).sigmoid().cpu(), y_true)
+                        for x, y_true in tqdm(data_loader, desc="Predicting")
+                    ]
+                )
+            ]
 
         preds = torch.cat(preds).round().numpy()
         targets = torch.cat(targets).numpy()
