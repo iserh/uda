@@ -54,4 +54,4 @@ class HParams(Config):
         return _Optimizer[self.optimizer].value
 
     def get_criterion(self) -> Type[nn.Module]:
-        return _LossCriterion[self.criterion].value(self.loss_kwargs)
+        return _LossCriterion[self.criterion].value(**self.loss_kwargs)

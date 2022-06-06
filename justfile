@@ -8,7 +8,7 @@ install:
     poetry install
 
 bg +cmd:
-    tmux new-session -s "bg-session" "just _bg {{cmd}}"
+    tmux new-session -d -s "bg-session" "just _bg {{cmd}}"
 _bg +cmd:
     eval "$(conda shell.bash hook)" && \
     conda activate uda && \
