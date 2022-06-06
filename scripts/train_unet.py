@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Tuple
+from typing import Tuple, List
 
 import ignite
 import numpy as np
@@ -28,7 +28,7 @@ def binary_one_hot_output_transform(output: Tuple[torch.Tensor, torch.Tensor]) -
     return y_pred, y.long()
 
 
-def run(config_dir: Path, data_dir: Path) -> None:
+def run(config_dir: Path, data_dir: Path, tags: List[str]) -> None:
     # load configuration files
     dataset_conf = CC359Config.from_file(config_dir / "cc359.yml")
     unet_conf = UNetConfig.from_file(config_dir / "unet.yml")
@@ -36,7 +36,7 @@ def run(config_dir: Path, data_dir: Path) -> None:
 
     run = wandb.init(
         project="UDA",
-        tags=["Benchmark"],
+        tags=tags,
         name=f"UNet{unet_conf.dim}D-Source={dataset_conf.vendor}",
         config={
             "hparams": hparams.__dict__,
@@ -208,10 +208,15 @@ def run(config_dir: Path, data_dir: Path) -> None:
 
 if __name__ == "__main__":
     from cross_evaluate_run import cross_evaluate_run
+    from argparse import ArgumentParser
+
+    parser = ArgumentParser()
+    parser.add_argument("tags", nargs='+', default=["hidden"])
+    args = parser.parse_args()
 
     # directories
     data_dir = Path("/tmp/data/CC359")
     config_dir = Path("config")
 
-    run_id = run(config_dir, data_dir)
+    run_id = run(config_dir, data_dir, tags=args.tags)
     cross_evaluate_run(run_id)
