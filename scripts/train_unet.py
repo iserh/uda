@@ -132,11 +132,6 @@ def run(config_dir: Path, data_dir: Path, tags: List[str]) -> None:
             y_pred = y_pred[slice_index].numpy().astype(np.uint8)
             y_true = y_true[slice_index].numpy().astype(np.uint8)
 
-            # rotate images & masks
-            data = np.rot90(data, k=2)
-            y_pred = np.rot90(y_pred, k=2)
-            y_true = np.rot90(y_true, k=2)
-
             wandb_img = wandb.Image(
                 data,
                 masks={

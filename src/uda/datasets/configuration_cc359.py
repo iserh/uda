@@ -20,7 +20,7 @@ class CC359Config(Config):
 
     vendor: str
     fold: Optional[int] = None
-    rotate: bool = True
+    rotate: Optional[int] = 1
     flatten: bool = True
     patch_dims: Optional[Tuple[int, int, int]] = None
     flatten_patches: bool = True

@@ -103,9 +103,9 @@ class CC359(Dataset):
                 img = img.clip(min=self.clip_intensities[0], max=self.clip_intensities[1])
             img = scaler.fit_transform(img.reshape(-1, 1)).reshape(img.shape)
 
-            if self.rotate:
-                img = np.rot90(img, k=-1, axes=(1, 2))
-                label = np.rot90(label, k=-1, axes=(1, 2))
+            if self.rotate is not None:
+                img = np.rot90(img, k=self.rotate, axes=(1, 2))
+                label = np.rot90(label, k=self.rotate, axes=(1, 2))
 
             # pad the images
             img = self.pad_array(img)
