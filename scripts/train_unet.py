@@ -112,7 +112,7 @@ def run(config_dir: Path, data_dir: Path, tags: List[str]) -> None:
         for i, (y_pred, y_true, x, spacing_mm) in tqdm(
             enumerate(zip(preds, targets, data, val_dataset.spacings_mm)),
             total=len(preds),
-            desc="Final Evaluation Metric Computing",
+            desc="Building Table",
             leave=False,
         ):
             dice = dice_score(y_pred, y_true)

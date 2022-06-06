@@ -19,10 +19,10 @@ def cross_evaluate_run(
     device = "cuda:0" if torch.cuda.is_available() else "cpu"
     print(f"Using device: {device}")
 
-    wandb.restore("config/cc359.yaml", f"tiser/UDA/{run_id}", root=files_dir, replace=True)
-    wandb.restore("config/hparams.yaml", f"tiser/UDA/{run_id}", root=files_dir, replace=True)
-    wandb.restore("config/unet.yaml", f"tiser/UDA/{run_id}", root=files_dir, replace=True)
-    wandb.restore("best_model", f"tiser/UDA/{run_id}", root=files_dir, replace=True)
+    wandb.restore("config/cc359.yaml", f"tiser/UDA-CC359/{run_id}", root=files_dir, replace=True)
+    wandb.restore("config/hparams.yaml", f"tiser/UDA-CC359/{run_id}", root=files_dir, replace=True)
+    wandb.restore("config/unet.yaml", f"tiser/UDA-CC359/{run_id}", root=files_dir, replace=True)
+    wandb.restore("best_model", f"tiser/UDA-CC359/{run_id}", root=files_dir, replace=True)
 
     unet_config: UNetConfig = UNetConfig.from_file(files_dir / "config/unet.yaml")
     dataset_config: CC359Config = CC359Config.from_file(files_dir / "config/cc359.yaml")
@@ -30,10 +30,9 @@ def cross_evaluate_run(
 
     dataset_config.fold = None
 
+    print(f"\nCross Evaluating run {run_id}\n")
     for vendor in vendors:
-        print()
-        print(f"EVALUATING VENDOR - {vendor} -")
-        print()
+        print(f"\nEVALUATING VENDOR - {vendor} -\n")
 
         dataset_config.vendor = vendor
 
@@ -45,7 +44,7 @@ def cross_evaluate_run(
         model.eval().to(device)
 
         with torch.no_grad():
-            preds, targets = [*zip(*[(model(x.to(device)).sigmoid().cpu(), y_true) for x, y_true in tqdm(data_loader)])]
+            preds, targets = [*zip(*[(model(x.to(device)).sigmoid().cpu(), y_true) for x, y_true in tqdm(data_loader, desc="Predicting")])]
 
         preds = torch.cat(preds).round().numpy()
         targets = torch.cat(targets).numpy()
@@ -64,7 +63,7 @@ def cross_evaluate_run(
         for i, (y_pred, y_true, x, spacing_mm) in tqdm(
             enumerate(zip(preds, targets, data, dataset.spacings_mm)),
             total=len(preds),
-            desc="Final Evaluation Metric Computing",
+            desc="Building Table",
             leave=False,
         ):
             dice = dice_score(y_pred, y_true)
@@ -91,7 +90,7 @@ def cross_evaluate_run(
         dice_mean = np.array(table.get_column("Dice")).mean()
         surface_dice_mean = np.array(table.get_column("Surface Dice")).mean()
 
-        run = wandb.init(project="UDA", id=run_id, resume=True)
+        run = wandb.init(project="UDA-CC359", id=run_id, resume=True)
 
         run.log({f"{dataset.vendor}_results": table})
         run.summary[f"{dataset.vendor}_dice"] = dice_mean
