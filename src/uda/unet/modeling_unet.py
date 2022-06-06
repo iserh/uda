@@ -63,7 +63,6 @@ class UNetDecoder(nn.Module):
             padding=0,
             bias=False,
         )
-        self.final_act = nn.Sigmoid() if config.out_channels == 1 else nn.Softmax(dim=1)
 
     def forward(self, x: torch.Tensor, hidden_states: List[torch.Tensor]) -> torch.Tensor:
         for block, up_conv, hidden_state in zip(self.blocks, self.up_convs, reversed(hidden_states)):
@@ -71,8 +70,7 @@ class UNetDecoder(nn.Module):
             x = torch.cat([x, hidden_state], dim=1)
             x = block(x)
         # map to classes
-        x = self.mapping_conv(x)
-        return self.final_act(x)
+        return self.mapping_conv(x)
 
 
 class UNet(nn.Module):

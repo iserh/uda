@@ -50,11 +50,11 @@ def reshape_to_volume(
 
 def binary_one_hot_output_transform(output: Tuple[torch.Tensor, torch.Tensor]) -> Tuple[torch.Tensor, torch.Tensor]:
     y_pred, y = output
-    y_pred = y_pred.round().long()
+    y_pred = y_pred.sigmoid().round().long()
     y_pred = to_onehot(y_pred, 2)
     return y_pred, y.long()
 
 
 def flatten_output_transform(output: Tuple[torch.Tensor, torch.Tensor], dim: int = 0) -> None:
     y_pred, y_true = output
-    return y_pred.round().long().flatten(dim), y_true.flatten(dim)
+    return y_pred.sigmoid().round().long().flatten(dim), y_true.flatten(dim)

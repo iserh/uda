@@ -29,8 +29,8 @@ def run(config_dir: Path, data_dir: Path, tags: List[str]) -> None:
     run = wandb.init(
         project=f"UDA-{CC359.__name__}",
         tags=tags,
-        name=f"UNet{unet_config.dim}D-Source={dataset_config.vendor}",
-        # name=f"{unet_config.dim}D-{hparams.criterion}-SD={hparams.dice_pow}",
+        name=f"UNet-{unet_config.dim}D-Source={dataset_config.vendor}",
+        # name=f"UNet-{unet_config.dim}D-{hparams.criterion}-SD={hparams.dice_pow}",
         config={
             "hparams": hparams.__dict__,
             "dataset": dataset_config.__dict__,
@@ -55,8 +55,7 @@ def run(config_dir: Path, data_dir: Path, tags: List[str]) -> None:
     model = UNet(unet_config)
 
     n_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
-    run.summary["n_parameters"] = n_params
-    run.summary.update()
+    run.summary.update({"n_parameters": n_params})
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
@@ -83,7 +82,7 @@ def run(config_dir: Path, data_dir: Path, tags: List[str]) -> None:
     final_evaluator = create_supervised_evaluator(model, device=device)
     final_evaluator.logger = setup_logger("Final Evaluator")
     # gather outputs in final evaluation for visualization
-    eos = EpochOutputStore()
+    eos = EpochOutputStore(output_transform=lambda output: (output[0].sigmoid().cpu(), output[1].cpu()))
     eos.attach(final_evaluator, "output")
 
     # evaluation callback
@@ -98,11 +97,6 @@ def run(config_dir: Path, data_dir: Path, tags: List[str]) -> None:
         final_evaluator.run(val_loader)
 
         preds, targets = [*zip(*final_evaluator.state.output)]
-
-        # move to cpu (important to do this before torch.cat because of memory limitations)
-        preds = [y_pred.cpu() for y_pred in preds]
-        targets = [y_true.cpu() for y_true in targets]
-
         preds = torch.cat(preds).round().numpy()
         targets = torch.cat(targets).numpy()
 
@@ -144,8 +138,8 @@ def run(config_dir: Path, data_dir: Path, tags: List[str]) -> None:
 
         surface_dice_mean = np.array(table.get_column("Surface Dice")).mean()
 
-        run.log({"Segmentation": table})
-        wandb.run.summary["validation/surface_dice"] = surface_dice_mean
+        run.log({"validation_set_results": table})
+        run.summary.update({"validation/surface_dice": surface_dice_mean})
 
     # -------------------- Handlers --------------------
     # -----------------------------------------------------
@@ -204,8 +198,6 @@ def run(config_dir: Path, data_dir: Path, tags: List[str]) -> None:
 if __name__ == "__main__":
     from argparse import ArgumentParser
 
-    from cross_evaluate_run import cross_evaluate_run
-
     parser = ArgumentParser()
     parser.add_argument("-t", "--tags", nargs="+", default=[])
     args = parser.parse_args()
@@ -215,4 +207,6 @@ if __name__ == "__main__":
     config_dir = Path("config")
 
     run_id = run(config_dir, data_dir, tags=args.tags)
+
+    # from cross_evaluate_run import cross_evaluate_run
     # cross_evaluate_run(run_id)
