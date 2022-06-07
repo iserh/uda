@@ -46,7 +46,6 @@ class UNetDecoder(nn.Module):
             dec_block = dec_block.copy()
             dec_block[0] += enc_block[-1]
             decoder_blocks.append(dec_block)
-            print(dec_block)
 
         self.blocks = nn.ModuleList([BackboneClass(b, config.dim, config.batch_norm) for b in decoder_blocks])
 
