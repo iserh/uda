@@ -11,7 +11,7 @@ class DiceWithLogitsLoss(nn.Module):
         self,
         sigmoid: bool = True,
         softmax: bool = False,
-        squared_pred: bool = False,
+        squared_pred: bool = True,
         smooth_nr: float = 0,
         smooth_dr: float = 1,
     ) -> None:
@@ -45,7 +45,7 @@ class DiceBCEWithLogitsLoss(nn.Module):
 def dice_loss(
     y_pred: torch.Tensor,
     y_true: torch.Tensor,
-    squared_pred: bool = False,
+    squared_pred: bool = True,
     smooth_nr: float = 0,
     smooth_dr: float = 1,
 ) -> torch.Tensor:
