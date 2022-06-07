@@ -12,7 +12,7 @@ class DiceWithLogitsLoss(nn.Module):
         sigmoid: bool = True,
         softmax: bool = False,
         squared_pred: bool = True,
-        smooth_nr: float = 0,
+        smooth_nr: float = 1,
         smooth_dr: float = 1,
     ) -> None:
         super(DiceWithLogitsLoss, self).__init__()
@@ -46,7 +46,7 @@ def dice_loss(
     y_pred: torch.Tensor,
     y_true: torch.Tensor,
     squared_pred: bool = True,
-    smooth_nr: float = 0,
+    smooth_nr: float = 1,
     smooth_dr: float = 1,
 ) -> torch.Tensor:
     # flatten
