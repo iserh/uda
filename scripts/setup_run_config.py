@@ -31,4 +31,3 @@ unet_config = UNetConfig(
     decoder_blocks=((8, 8),),
 )
 unet_config.save(config_dir / "unet.yaml")
-

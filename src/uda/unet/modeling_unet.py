@@ -15,7 +15,9 @@ class UNetEncoder(nn.Module):
         super(UNetEncoder, self).__init__()
         BackboneClass = config.get_encoder_backbone()
         # encoder blocks
-        self.blocks = nn.ModuleList([BackboneClass(channels, config.dim, config.batch_norm) for channels in config.encoder_blocks])
+        self.blocks = nn.ModuleList(
+            [BackboneClass(channels, config.dim, config.batch_norm) for channels in config.encoder_blocks]
+        )
         self.max_pool = MaxPoolNd(dim=config.dim, kernel_size=2, stride=2)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -50,19 +52,24 @@ class UNetDecoder(nn.Module):
 
         # first upwards convolution goes from encoder output to first decoder block
         up_conv_channels = [(config.encoder_blocks[-1][-1], config.decoder_blocks[0][0])]
-        up_conv_channels += [(low_block[-1], high_block[0]) for low_block, high_block in zip(config.decoder_blocks[:-1], config.decoder_blocks[1:])]
+        up_conv_channels += [
+            (low_block[-1], high_block[0])
+            for low_block, high_block in zip(config.decoder_blocks[:-1], config.decoder_blocks[1:])
+        ]
         # upwards convolutions
-        self.up_convs = nn.ModuleList([
-            ConvTransposeNd(
-                dim=config.dim,
-                in_channels=in_channels,
-                out_channels=out_channels,
-                kernel_size=2,
-                stride=2,
-                # bias=False,
-            )
-            for in_channels, out_channels in up_conv_channels
-        ])
+        self.up_convs = nn.ModuleList(
+            [
+                ConvTransposeNd(
+                    dim=config.dim,
+                    in_channels=in_channels,
+                    out_channels=out_channels,
+                    kernel_size=2,
+                    stride=2,
+                    # bias=False,
+                )
+                for in_channels, out_channels in up_conv_channels
+            ]
+        )
 
         # maps to classes
         self.mapping_conv = ConvNd(

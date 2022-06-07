@@ -10,6 +10,7 @@ from ignite.engine import Engine, Events, create_supervised_evaluator, create_su
 from ignite.handlers import EpochOutputStore, ModelCheckpoint
 from ignite.metrics import ConfusionMatrix, DiceCoefficient, Loss
 from ignite.utils import setup_logger
+from pyparsing import Optional
 from surface_distance import compute_surface_dice_at_tolerance, compute_surface_distances
 from torch.utils.data import DataLoader
 from tqdm import tqdm
@@ -20,7 +21,7 @@ from uda.metrics import dice_score
 from uda.utils import binary_one_hot_output_transform, reshape_to_volume
 
 
-def run(config_dir: Path, data_dir: Path, tags: List[str]) -> None:
+def run(config_dir: Path, data_dir: Path, tags: List[str], group: Optional[str] = None) -> None:
     # load configuration files
     dataset_config: CC359Config = CC359Config.from_file(config_dir / "cc359.yaml")
     unet_config: UNetConfig = UNetConfig.from_file(config_dir / "unet.yaml")
@@ -31,6 +32,7 @@ def run(config_dir: Path, data_dir: Path, tags: List[str]) -> None:
     run = wandb.init(
         project=f"UDA-{CC359.__name__}",
         tags=tags,
+        group=group,
         name=run_name,
         config={
             "hparams": hparams.__dict__,
@@ -207,7 +209,7 @@ if __name__ == "__main__":
     data_dir = Path("/tmp/data/CC359")
     config_dir = Path("config")
 
-    run_id = run(config_dir, data_dir, tags=args.tags)
+    run_id = run(config_dir, data_dir, tags=args.tags, group=None)
 
     # from cross_evaluate_run import cross_evaluate_run
     # cross_evaluate_run(run_id)
