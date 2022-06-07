@@ -179,14 +179,14 @@ def run(config_dir: Path, data_dir: Path, tags: List[str], group: Optional[str] 
         else:
             return 0
 
-    model_checkpoint = ModelCheckpoint(
-        wandb_logger.run.dir,
-        n_saved=1,
-        score_function=score_function,
-        filename_pattern="best_model",
-    )
+    # model_checkpoint = ModelCheckpoint(
+    #     wandb_logger.run.dir,
+    #     n_saved=1,
+    #     score_function=score_function,
+    #     filename_pattern="best_model.pt",
+    # )
 
-    validation_evaluator.add_event_handler(Events.COMPLETED, model_checkpoint, {"model": model})
+    # validation_evaluator.add_event_handler(Events.COMPLETED, model_checkpoint, {"model": model})
 
     # -------------------- training --------------------
 
