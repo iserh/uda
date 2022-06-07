@@ -14,15 +14,15 @@ vendors = ["PHILIPS_3", "PHILIPS_15", "SIEMENS_3", "SIEMENS_15", "GE_3", "GE_15"
 
 
 def cross_evaluate_run(
-    run_id: str, data_dir: Path = Path("/tmp/data/CC359"), files_dir: Path = Path("/tmp/files")
+    run_id: str, project: str, data_dir: Path = Path("/tmp/data/CC359"), files_dir: Path = Path("/tmp/files")
 ) -> None:
     device = "cuda:0" if torch.cuda.is_available() else "cpu"
     print(f"Using device: {device}")
 
-    wandb.restore("config/cc359.yaml", f"tiser/UDA-CC359/{run_id}", root=files_dir, replace=True)
-    wandb.restore("config/hparams.yaml", f"tiser/UDA-CC359/{run_id}", root=files_dir, replace=True)
-    wandb.restore("config/unet.yaml", f"tiser/UDA-CC359/{run_id}", root=files_dir, replace=True)
-    wandb.restore("best_model", f"tiser/UDA-CC359/{run_id}", root=files_dir, replace=True)
+    wandb.restore("config/cc359.yaml", f"tiser/{project}/{run_id}", root=files_dir, replace=True)
+    wandb.restore("config/hparams.yaml", f"tiser/{project}/{run_id}", root=files_dir, replace=True)
+    wandb.restore("config/unet.yaml", f"tiser/{project}/{run_id}", root=files_dir, replace=True)
+    wandb.restore("best_model.pt", f"tiser/{project}/{run_id}", root=files_dir, replace=True)
 
     unet_config: UNetConfig = UNetConfig.from_file(files_dir / "config/unet.yaml")
     dataset_config: CC359Config = CC359Config.from_file(files_dir / "config/cc359.yaml")
@@ -39,7 +39,7 @@ def cross_evaluate_run(
         dataset = CC359(data_dir, dataset_config)
         data_loader = torch.utils.data.DataLoader(dataset, batch_size=hparams.val_batch_size, shuffle=False)
 
-        model = UNet.from_pretrained(files_dir / "best_model", unet_config)
+        model = UNet.from_pretrained(files_dir / "best_model.pt", unet_config)
 
         model.eval().to(device)
 
@@ -97,7 +97,7 @@ def cross_evaluate_run(
         dice_mean = np.array(table.get_column("Dice")).mean()
         surface_dice_mean = np.array(table.get_column("Surface Dice")).mean()
 
-        run = wandb.init(project="UDA-CC359", id=run_id, resume=True)
+        run = wandb.init(project=project, id=run_id, resume=True)
 
         run.log({f"{dataset.vendor}_results": table})
         run.summary[f"{dataset.vendor}_dice"] = dice_mean
@@ -110,7 +110,8 @@ if __name__ == "__main__":
     from argparse import ArgumentParser
 
     parser = ArgumentParser()
+    parser.add_argument("project", type=str)
     parser.add_argument("run_id", type=str)
     args = parser.parse_args()
 
-    cross_evaluate_run(args.run_id)
+    cross_evaluate_run(args.run_id, project=args.project)

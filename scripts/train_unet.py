@@ -1,27 +1,22 @@
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 
-import numpy as np
 import torch
 import wandb
 from ignite.contrib.handlers.tqdm_logger import ProgressBar
 from ignite.contrib.handlers.wandb_logger import WandBLogger
 from ignite.engine import Engine, Events, create_supervised_evaluator, create_supervised_trainer
-from ignite.handlers import EpochOutputStore, ModelCheckpoint
+from ignite.handlers import EarlyStopping, ModelCheckpoint
 from ignite.metrics import ConfusionMatrix, DiceCoefficient, Loss
 from ignite.utils import setup_logger
-from pyparsing import Optional
-from surface_distance import compute_surface_dice_at_tolerance, compute_surface_distances
 from torch.utils.data import DataLoader
-from tqdm import tqdm
 
 from uda import HParams, UNet, UNetConfig
 from uda.datasets import CC359, CC359Config
-from uda.metrics import dice_score
-from uda.utils import binary_one_hot_output_transform, reshape_to_volume
+from uda.utils import binary_one_hot_output_transform
 
 
-def run(config_dir: Path, data_dir: Path, tags: List[str], group: Optional[str] = None) -> None:
+def run(config_dir: Path, data_dir: Path, project: str, tags: List[str] = [], group: Optional[str] = None) -> None:
     # load configuration files
     dataset_config: CC359Config = CC359Config.from_file(config_dir / "cc359.yaml")
     unet_config: UNetConfig = UNetConfig.from_file(config_dir / "unet.yaml")
@@ -30,7 +25,7 @@ def run(config_dir: Path, data_dir: Path, tags: List[str], group: Optional[str] 
     # run_name = f"UNet-{unet_config.dim}D-Source={dataset_config.vendor}"
     run_name = f"UNet-{unet_config.dim}D-{hparams.criterion}"
     run = wandb.init(
-        project=f"UDA-{CC359.__name__}",
+        project=project,
         tags=tags,
         group=group,
         name=run_name,
@@ -82,67 +77,11 @@ def run(config_dir: Path, data_dir: Path, tags: List[str], group: Optional[str] 
     validation_evaluator = create_supervised_evaluator(model, metrics=metrics, device=device)
     validation_evaluator.logger = setup_logger("Val Evaluator")
 
-    final_evaluator = create_supervised_evaluator(model, device=device)
-    final_evaluator.logger = setup_logger("Final Evaluator")
-    # gather outputs in final evaluation for visualization
-    eos = EpochOutputStore(output_transform=lambda output: (output[0].sigmoid().cpu(), output[1].cpu()))
-    eos.attach(final_evaluator, "output")
-
     # evaluation callback
     @trainer.on(Events.EPOCH_COMPLETED)
     def compute_metrics(engine: Engine) -> None:
         train_evaluator.run(train_loader)
         validation_evaluator.run(val_loader)
-
-    # final evaluation
-    @trainer.on(Events.COMPLETED)
-    def compute_final_metrics(engine: Engine) -> None:
-        final_evaluator.run(val_loader)
-
-        preds, targets = [*zip(*final_evaluator.state.output)]
-        preds = torch.cat(preds).round().numpy()
-        targets = torch.cat(targets).numpy()
-
-        preds = reshape_to_volume(preds, val_dataset.imsize, val_dataset.patch_size)
-        targets = reshape_to_volume(targets, val_dataset.imsize, val_dataset.patch_size)
-        data = reshape_to_volume(val_dataset.data, val_dataset.imsize, val_dataset.patch_size)
-
-        class_labels = {1: "Skull"}
-        slice_index = val_dataset.imsize[0] // 2
-
-        table = wandb.Table(columns=["ID", "Dice", "Surface Dice", "Image"])
-
-        for i, (y_pred, y_true, x, spacing_mm) in tqdm(
-            enumerate(zip(preds, targets, data, val_dataset.spacings_mm)),
-            total=len(preds),
-            desc="Building Table",
-            leave=False,
-        ):
-            dice = dice_score(y_pred, y_true)
-            surface_dice = compute_surface_dice_at_tolerance(
-                compute_surface_distances(y_true.astype(bool), y_pred.astype(bool), spacing_mm),
-                tolerance_mm=hparams.sf_dice_tolerance,
-            )
-
-            # the raw background image as a numpy array
-            x = (x[slice_index] * 255).astype(np.uint8)
-            y_pred = y_pred[slice_index].astype(np.uint8)
-            y_true = y_true[slice_index].astype(np.uint8)
-
-            wandb_img = wandb.Image(
-                x,
-                masks={
-                    "prediction": {"mask_data": y_pred, "class_labels": class_labels},
-                    "ground truth": {"mask_data": y_true, "class_labels": class_labels},
-                },
-            )
-
-            table.add_data(i, dice, surface_dice, wandb_img)
-
-        surface_dice_mean = np.array(table.get_column("Surface Dice")).mean()
-
-        # run.log({"validation_set_results": table})
-        run.summary.update({"validation/surface_dice": surface_dice_mean})
 
     # -------------------- Handlers --------------------
     # -----------------------------------------------------
@@ -179,14 +118,25 @@ def run(config_dir: Path, data_dir: Path, tags: List[str], group: Optional[str] 
         else:
             return 0
 
-    # model_checkpoint = ModelCheckpoint(
-    #     wandb_logger.run.dir,
-    #     n_saved=1,
-    #     score_function=score_function,
-    #     filename_pattern="best_model.pt",
-    # )
+    model_checkpoint = ModelCheckpoint(
+        wandb_logger.run.dir,
+        n_saved=1,
+        score_function=score_function,
+        filename_pattern="best_model.pt",
+    )
 
-    # validation_evaluator.add_event_handler(Events.COMPLETED, model_checkpoint, {"model": model})
+    validation_evaluator.add_event_handler(Events.COMPLETED, model_checkpoint, {"model": model})
+
+    # -------------------- early stopping --------------------
+
+    if hparams.early_stopping:
+        early_stopping = EarlyStopping(
+            patience=hparams.early_stopping_patience,
+            score_function=score_function,
+            trainer=trainer,
+        )
+
+        evaluator.add_event_handler(Events.COMPLETED, early_stopping)
 
     # -------------------- training --------------------
 
@@ -208,8 +158,18 @@ if __name__ == "__main__":
     # directories
     data_dir = Path("/tmp/data/CC359")
     config_dir = Path("config")
+    project = "UDA-CC359"
 
-    run_id = run(config_dir, data_dir, tags=args.tags, group=None)
+    run_id = run(config_dir, data_dir, project=project, tags=args.tags, group=None)
+
+    from evaluate_run import evaluate_run
+
+    evaluate_run(run_id, project=project)
 
     # from cross_evaluate_run import cross_evaluate_run
-    # cross_evaluate_run(run_id)
+
+    # cross_evaluate_run(run_id, project=project)
+
+    from delete_model_binaries import delete_model_binaries
+
+    delete_model_binaries(run_id, project=project)

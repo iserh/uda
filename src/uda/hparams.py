@@ -49,6 +49,8 @@ class HParams(Config):
     val_batch_size: int = 1
     loss_kwargs: Optional[Dict[str, Any]] = field(default_factory=dict)
     sf_dice_tolerance: float = 1
+    early_stopping: bool = True
+    early_stopping_patience: Optional[int] = 5
 
     def get_optimizer(self) -> Type[torch.optim.Optimizer]:
         return _Optimizer[self.optimizer].value
