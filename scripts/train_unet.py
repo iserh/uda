@@ -26,8 +26,8 @@ def run(config_dir: Path, data_dir: Path, tags: List[str]) -> None:
     unet_config: UNetConfig = UNetConfig.from_file(config_dir / "unet.yaml")
     hparams: HParams = HParams.from_file(config_dir / "hparams.yaml")
 
-    run_name = f"UNet-{unet_config.dim}D-Source={dataset_config.vendor}"
-    # run_name = f"UNet-{unet_config.dim}D-{hparams.criterion}"
+    # run_name = f"UNet-{unet_config.dim}D-Source={dataset_config.vendor}"
+    run_name = f"UNet-{unet_config.dim}D-{hparams.criterion}"
     run = wandb.init(
         project=f"UDA-{CC359.__name__}",
         tags=tags,
@@ -42,7 +42,7 @@ def run(config_dir: Path, data_dir: Path, tags: List[str]) -> None:
     run.save(str(config_dir / "*"), policy="now")
     run.save(str(Path(__file__)), policy="now")
 
-    cc359 = run.use_artifact("CC359-Skull-stripping:latest")
+    cc359 = run.use_artifact("tiser/UDA-Datasets/CC359-Skull-stripping:latest")
     data_dir = cc359.download(root=data_dir)
 
     train_dataset = CC359(data_dir, dataset_config, train=True)
@@ -139,7 +139,7 @@ def run(config_dir: Path, data_dir: Path, tags: List[str]) -> None:
 
         surface_dice_mean = np.array(table.get_column("Surface Dice")).mean()
 
-        run.log({"validation_set_results": table})
+        # run.log({"validation_set_results": table})
         run.summary.update({"validation/surface_dice": surface_dice_mean})
 
     # -------------------- Handlers --------------------
