@@ -34,7 +34,7 @@ class UNetConfig(Config):
     encoder_backbone: UNetBackbones = UNetBackbones.Vanilla
     decoder_backbone: UNetBackbones = UNetBackbones.Vanilla
     dim: int = 2
-    batch_norm: bool = False
+    batch_norm: bool = True
 
     def get_encoder_backbone(self) -> nn.Module:
         return _UNetBackbones[self.encoder_backbone].value

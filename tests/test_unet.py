@@ -27,10 +27,10 @@ def unet_config_default() -> UNetConfig:
         ],
         decoder_blocks=[
             [256, 128, 128],
-            [128, 64, 64],
-            [64, 32, 32],
-            [32, 16, 16],
-            [16, 8, 8],
+            [64, 64, 64],
+            [32, 32, 32],
+            [16, 16, 16],
+            [8, 8, 8],
         ],
     )
 
@@ -97,7 +97,7 @@ def test_unet_res_net(unet_config_default: UNetConfig, device: str) -> None:
     unet_config_default.dim = 2
     unet_config_default.encoder_backbone = UNetBackbones.ResNet
     unet_config_default.decoder_backbone = UNetBackbones.ResNet
-    unet_config_default.batch_norm_after_encoder = False
+
     # create model
     model = UNet(unet_config_default)
 

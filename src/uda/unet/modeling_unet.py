@@ -15,18 +15,18 @@ class UNetEncoder(nn.Module):
         super(UNetEncoder, self).__init__()
         BackboneClass = config.get_encoder_backbone()
         # encoder blocks
-        self.blocks = nn.ModuleList([BackboneClass(channels, config.dim) for channels in config.encoder_blocks])
+        self.blocks = nn.ModuleList([BackboneClass(channels, config.dim, config.batch_norm) for channels in config.encoder_blocks])
         self.max_pool = MaxPoolNd(dim=config.dim, kernel_size=2, stride=2)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         # apply initial encoder block
         x = self.blocks[0](x)
 
-        hidden_states = []  # save hidden states for use in decoder
+        hidden_states = [x]  # save hidden states for use in decoder
         for block in self.blocks[1:]:
-            hidden_states.append(x)
             x = self.max_pool(x)
             x = block(x)
+            hidden_states.append(x)
 
         return x, hidden_states
 
@@ -37,21 +37,32 @@ class UNetDecoder(nn.Module):
     def __init__(self, config: UNetConfig) -> None:
         super(UNetDecoder, self).__init__()
         BackboneClass = config.get_decoder_backbone()
-        self.blocks = nn.ModuleList([BackboneClass(b, config.dim) for b in config.decoder_blocks])
 
-        self.up_convs = nn.ModuleList(
-            [
-                ConvTransposeNd(
-                    dim=config.dim,
-                    in_channels=channels[0],
-                    out_channels=channels[0] // 2,
-                    kernel_size=2,
-                    stride=2,
-                    bias=False,
-                )
-                for channels in config.decoder_blocks
-            ]
-        )
+        # edit decoder blocks to add encoder channels to first part of the block
+        decoder_blocks = []
+        for enc_block, dec_block in zip(reversed(config.encoder_blocks[:-1]), config.decoder_blocks):
+            dec_block = dec_block.copy()
+            dec_block[0] += enc_block[-1]
+            decoder_blocks.append(dec_block)
+            print(dec_block)
+
+        self.blocks = nn.ModuleList([BackboneClass(b, config.dim, config.batch_norm) for b in decoder_blocks])
+
+        # first upwards convolution goes from encoder output to first decoder block
+        up_conv_channels = [(config.encoder_blocks[-1][-1], config.decoder_blocks[0][0])]
+        up_conv_channels += [(low_block[-1], high_block[0]) for low_block, high_block in zip(config.decoder_blocks[:-1], config.decoder_blocks[1:])]
+        # upwards convolutions
+        self.up_convs = nn.ModuleList([
+            ConvTransposeNd(
+                dim=config.dim,
+                in_channels=in_channels,
+                out_channels=out_channels,
+                kernel_size=2,
+                stride=2,
+                # bias=False,
+            )
+            for in_channels, out_channels in up_conv_channels
+        ])
 
         # maps to classes
         self.mapping_conv = ConvNd(
@@ -61,7 +72,7 @@ class UNetDecoder(nn.Module):
             kernel_size=1,
             stride=1,
             padding=0,
-            bias=False,
+            # bias=False,
         )
 
     def forward(self, x: torch.Tensor, hidden_states: List[torch.Tensor]) -> torch.Tensor:
@@ -86,11 +97,11 @@ class UNet(nn.Module):
         self.encoder.apply(init_weights)
         self.decoder.apply(init_weights)
         # use xavier initialization mapping convolution because of sigmoid activation
-        self.decoder.mapping_conv.apply(lambda m: nn.init.xavier_uniform_(m.weight))
+        # self.decoder.mapping_conv.apply(lambda m: nn.init.xavier_uniform_(m.weight))
 
     def forward(self, x: torch.Tensor, ret_hidden_states: bool = False) -> torch.Tensor:
         x, hidden_states = self.encoder(x)
-        x = self.decoder(x, hidden_states)
+        x = self.decoder(x, hidden_states[:-1])
         return x if not ret_hidden_states else (x, hidden_states)
 
     def save(self, path: str) -> None:
