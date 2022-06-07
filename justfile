@@ -41,3 +41,6 @@ ssh pool_nr:
 
 list-sessions pool_nr:
     ssh -t pool-u-042-{{pool_nr}} "tmux ls"
+
+list-envs pool_nr:
+    ssh -t pool-u-042-{{pool_nr}} ". ~/.bashrc; conda env list"
