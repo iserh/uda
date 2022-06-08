@@ -1,18 +1,10 @@
 """U-Net configuration."""
 from dataclasses import dataclass
-from enum import Enum
 from typing import List
-
-import torch.nn as nn
 
 from uda.config import Config
 
-from .backbones_unet import _UNetBackbones
-
-
-class UNetBackbones(str, Enum):
-    Vanilla = _UNetBackbones.Vanilla.name
-    ResNet = _UNetBackbones.ResNet.name
+from .backbones import Backbone
 
 
 @dataclass
@@ -31,13 +23,7 @@ class UNetConfig(Config):
     out_channels: int
     encoder_blocks: List[List[int]]
     decoder_blocks: List[List[int]]
-    encoder_backbone: UNetBackbones = UNetBackbones.Vanilla
-    decoder_backbone: UNetBackbones = UNetBackbones.Vanilla
+    encoder_backbone: Backbone = Backbone.Vanilla
+    decoder_backbone: Backbone = Backbone.Vanilla
     dim: int = 2
     batch_norm: bool = True
-
-    def get_encoder_backbone(self) -> nn.Module:
-        return _UNetBackbones[self.encoder_backbone].value
-
-    def get_decoder_backbone(self) -> nn.Module:
-        return _UNetBackbones[self.decoder_backbone].value

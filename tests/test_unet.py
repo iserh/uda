@@ -5,7 +5,7 @@ from tempfile import TemporaryDirectory
 import pytest
 import torch
 
-from uda.unet import UNet, UNetBackbones, UNetConfig
+from uda.models import UNet, UNetConfig, Backbone
 
 
 @pytest.fixture
@@ -95,8 +95,8 @@ def test_unet_invalid_dimension(unet_config_default: UNetConfig) -> None:
 def test_unet_res_net(unet_config_default: UNetConfig, device: str) -> None:
     # change the default configuration
     unet_config_default.dim = 2
-    unet_config_default.encoder_backbone = UNetBackbones.ResNet
-    unet_config_default.decoder_backbone = UNetBackbones.ResNet
+    unet_config_default.encoder_backbone = Backbone.ResNet
+    unet_config_default.decoder_backbone = Backbone.ResNet
 
     # create model
     model = UNet(unet_config_default)

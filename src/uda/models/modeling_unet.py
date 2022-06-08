@@ -6,6 +6,7 @@ import torch.nn as nn
 
 from .configuration_unet import UNetConfig
 from .modules import ConvNd, ConvTransposeNd, MaxPoolNd
+from .backbones import get_backbone_impl
 
 
 class UNetEncoder(nn.Module):
@@ -13,7 +14,7 @@ class UNetEncoder(nn.Module):
 
     def __init__(self, config: UNetConfig) -> None:
         super(UNetEncoder, self).__init__()
-        BackboneClass = config.get_encoder_backbone()
+        BackboneClass = get_backbone_impl(config.encoder_backbone)
         # encoder blocks
         self.blocks = nn.ModuleList(
             [BackboneClass(channels, config.dim, config.batch_norm) for channels in config.encoder_blocks]
@@ -38,7 +39,7 @@ class UNetDecoder(nn.Module):
 
     def __init__(self, config: UNetConfig) -> None:
         super(UNetDecoder, self).__init__()
-        BackboneClass = config.get_decoder_backbone()
+        BackboneClass = get_backbone_impl(config.decoder_backbone)
 
         # edit decoder blocks to add encoder channels to first part of the block
         decoder_blocks = []

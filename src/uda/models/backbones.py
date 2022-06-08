@@ -134,8 +134,17 @@ class ResNetBlock(nn.Module):
         return x
 
 
-class _UNetBackbones(Enum):
+class _Backbone(Enum):
     """Backbones for the U-Net."""
 
     Vanilla = VanillaBlock
     ResNet = ResNetBlock
+
+
+class Backbone(str, Enum):
+    Vanilla = _Backbone.Vanilla.name
+    ResNet = _Backbone.ResNet.name
+
+
+def get_backbone_impl(backbone: Backbone) -> nn.Module:
+    return _Backbone[backbone].value
