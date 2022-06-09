@@ -9,6 +9,7 @@ config_dir.mkdir(exist_ok=True)
 dataset_config = CC359Config(
     vendor="GE_3",
     fold=0,
+    # flatten=True,
     patch_size=(64, 256, 256),
     random_state=42,
 )
