@@ -5,7 +5,7 @@ from tempfile import TemporaryDirectory
 import pytest
 import torch
 
-from uda.models import UNet, UNetConfig, Backbone
+from uda.models import UNet, UNetConfig
 
 
 @pytest.fixture
@@ -16,22 +16,21 @@ def device() -> str:
 @pytest.fixture()
 def unet_config_default() -> UNetConfig:
     return UNetConfig(
+        in_channels=1,
         out_channels=2,
         encoder_blocks=[
-            [1, 8, 8],
-            [8, 16, 16],
-            [16, 32, 32],
-            [32, 64, 64],
-            [64, 128, 128],
-            [128, 256, 256],
+            [8, 16, 16, 16],
+            [16, 32, 32, 32],
+            [32, 64, 64, 64],
+            [64, 128, 128, 128],
         ],
         decoder_blocks=[
-            [256, 128, 128],
-            [64, 64, 64],
-            [32, 32, 32],
-            [16, 16, 16],
-            [8, 8, 8],
+            [128, 64, 64, 64],
+            [64, 32, 32, 32],
+            [32, 16, 16, 16],
+            [16, 8, 8, 8],
         ],
+        dim=3,
     )
 
 
@@ -53,6 +52,8 @@ def test_unet_1d(unet_config_default: UNetConfig, device: str) -> None:
 
 
 def test_unet_2d(unet_config_default: UNetConfig, device: str) -> None:
+    # change the default configuration
+    unet_config_default.dim = 2
     # create model
     model = UNet(unet_config_default)
 
@@ -87,34 +88,6 @@ def test_unet_3d(unet_config_default: UNetConfig, device: str) -> None:
 def test_unet_invalid_dimension(unet_config_default: UNetConfig) -> None:
     # change the default configuration
     unet_config_default.dim = 4
-    # create model
-    with pytest.raises(Exception):
-        UNet(unet_config_default)
-
-
-def test_unet_res_net(unet_config_default: UNetConfig, device: str) -> None:
-    # change the default configuration
-    unet_config_default.dim = 2
-    unet_config_default.encoder_backbone = Backbone.ResNet
-    unet_config_default.decoder_backbone = Backbone.ResNet
-
-    # create model
-    model = UNet(unet_config_default)
-
-    # create 1D input - (batch_size, n_channels, dim_1, dim_2)
-    x = torch.randn(8, 1, 64, 64)
-    # move to device
-    model = model.to(device)
-    x = x.to(device)
-    # test model
-    y = model(x).detach().cpu()
-
-    assert y.shape == (8, 2, 64, 64)
-
-
-def test_unet_invalid_backbone(unet_config_default: UNetConfig) -> None:
-    # change the default configuration
-    unet_config_default.encoder_backbone = "InvalidBackbone"
     # create model
     with pytest.raises(Exception):
         UNet(unet_config_default)

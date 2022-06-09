@@ -32,8 +32,8 @@ def evaluate_run(
 
     print(f"Evaluating run {run_id}\n")
 
-    dataset = CC359(data_dir, dataset_config)
-    val_loader = torch.utils.data.DataLoader(dataset, batch_size=hparams.val_batch_size, shuffle=False)
+    val_dataset = CC359(data_dir, dataset_config)
+    val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=hparams.val_batch_size, shuffle=False)
 
     model = UNet.from_pretrained(files_dir / "best_model.pt", unet_config)
     model.eval().to(device)
@@ -46,19 +46,19 @@ def evaluate_run(
     preds = torch.cat(preds).round().numpy()
     targets = torch.cat(targets).numpy()
 
-    preds = reshape_to_volume(preds, dataset.imsize, dataset.patch_size)
-    targets = reshape_to_volume(targets, dataset.imsize, dataset.patch_size)
-    data = reshape_to_volume(dataset.data, dataset.imsize, dataset.patch_size)
+    preds = reshape_to_volume(preds, val_dataset.imsize, val_dataset.patch_size)
+    targets = reshape_to_volume(targets, val_dataset.imsize, val_dataset.patch_size)
+    data = reshape_to_volume(val_dataset.data, val_dataset.imsize, val_dataset.patch_size)
 
     model.cpu()
 
     class_labels = {1: "Skull"}
-    slice_index = dataset.imsize[0] // 2
+    slice_index = val_dataset.imsize[0] // 2
 
     table = wandb.Table(columns=["ID", "Dice", "Surface Dice", "Image"])
 
     for i, (y_pred, y_true, x, spacing_mm) in tqdm(
-        enumerate(zip(preds, targets, data, dataset.spacings_mm)),
+        enumerate(zip(preds, targets, data, val_dataset.spacings_mm)),
         total=len(preds),
         desc="Building Table",
         leave=False,

@@ -37,8 +37,10 @@ class HParams(Config):
     `learning_rate` : Learning rate
     `train_batch_size`: Batch Size for training
     `train_batch_size`: Batch Size for validation
+    `loss_kwargs`: Additional arguments for loss function
     `sf_dice_tolerance`: Tolerance value for surface dice
-    `dice_pow`: Square the denominator when using dice loss. Defaults to `True`
+    `early_stopping`: Use early stopping
+    `early_stopping_patience`: Number of epochs to wait before early stopping
     """
 
     epochs: int = 10
