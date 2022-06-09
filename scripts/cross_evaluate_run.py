@@ -109,7 +109,7 @@ def cross_evaluate_run(
         run.summary[f"{dataset.vendor}_dice"] = dice_mean
         run.summary[f"{dataset.vendor}_surface_dice"] = surface_dice_mean
 
-        wandb.finish()
+    wandb.finish()
 
 
 if __name__ == "__main__":
