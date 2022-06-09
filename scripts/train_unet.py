@@ -81,7 +81,8 @@ def run(config_dir: Path, data_dir: Path, project: str, tags: List[str] = [], gr
     @trainer.on(Events.EPOCH_COMPLETED)
     def compute_metrics(engine: Engine) -> None:
         train_evaluator.run(train_loader)
-        validation_evaluator.run(val_loader)
+        if train_dataset.fold is not None:
+            validation_evaluator.run(val_loader)
 
     # -------------------- Handlers --------------------
     # -----------------------------------------------------
@@ -164,7 +165,7 @@ if __name__ == "__main__":
 
     from evaluate_run import evaluate_run
 
-    evaluate_run(run_id, project=project)
+    evaluate_run(run_id, project=project, save_predictions=False)
 
     # from cross_evaluate_run import cross_evaluate_run
 

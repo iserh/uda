@@ -18,6 +18,8 @@ def evaluate_run(
     files_dir: Path = Path("/tmp/files"),
     save_predictions: bool = False,
 ) -> None:
+    run = wandb.init(project=project, id=run_id, resume=True)
+
     device = "cuda:0" if torch.cuda.is_available() else "cpu"
     print(f"Using device: {device}")
 
@@ -87,8 +89,6 @@ def evaluate_run(
     dice_mean = np.array(table.get_column("Dice")).mean()
     surface_dice_mean = np.array(table.get_column("Surface Dice")).mean()
 
-    run = wandb.init(project=project, id=run_id, resume=True)
-
     if save_predictions:
         run.log({"validation_results": table})
 
@@ -106,4 +106,4 @@ if __name__ == "__main__":
     parser.add_argument("run_id", type=str)
     args = parser.parse_args()
 
-    evaluate_run(args.run_id, project=args.project)
+    evaluate_run(args.run_id, project=args.project, save_predictions=True)

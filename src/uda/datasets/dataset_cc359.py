@@ -6,7 +6,7 @@ import nibabel as nib
 import numpy as np
 from nibabel.spatialimages import SpatialImage
 from sklearn.model_selection import KFold
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import MinMaxScaler
 from torch.utils.data import Dataset
 
 from uda.utils import is_notebook
@@ -85,7 +85,7 @@ class CC359(Dataset):
         if self.fold is not None:
             files = self.select_fold(files)
 
-        scaler = StandardScaler()
+        scaler = MinMaxScaler()
 
         images, labels, spacings_mm = [], [], []
         for file in tqdm(files, desc="Loading files"):

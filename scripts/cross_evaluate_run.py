@@ -14,8 +14,14 @@ vendors = ["PHILIPS_3", "PHILIPS_15", "SIEMENS_3", "SIEMENS_15", "GE_3", "GE_15"
 
 
 def cross_evaluate_run(
-    run_id: str, project: str, data_dir: Path = Path("/tmp/data/CC359"), files_dir: Path = Path("/tmp/files"), save_predictions: bool = False
+    run_id: str,
+    project: str,
+    data_dir: Path = Path("/tmp/data/CC359"),
+    files_dir: Path = Path("/tmp/files"),
+    save_predictions: bool = False,
 ) -> None:
+    run = wandb.init(project=project, id=run_id, resume=True)
+
     device = "cuda:0" if torch.cuda.is_available() else "cpu"
     print(f"Using device: {device}")
 
@@ -97,8 +103,6 @@ def cross_evaluate_run(
         dice_mean = np.array(table.get_column("Dice")).mean()
         surface_dice_mean = np.array(table.get_column("Surface Dice")).mean()
 
-        run = wandb.init(project=project, id=run_id, resume=True)
-
         if save_predictions:
             run.log({f"{dataset.vendor}_results": table})
 
@@ -116,4 +120,4 @@ if __name__ == "__main__":
     parser.add_argument("run_id", type=str)
     args = parser.parse_args()
 
-    cross_evaluate_run(args.run_id, project=args.project)
+    cross_evaluate_run(args.run_id, project=args.project, save_predictions=True)
