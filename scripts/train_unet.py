@@ -80,9 +80,9 @@ def run(config_dir: Path, data_dir: Path, project: str, tags: List[str] = [], gr
     # evaluation callback
     @trainer.on(Events.EPOCH_COMPLETED)
     def compute_metrics(engine: Engine) -> None:
-        train_evaluator.run(train_loader)
         if train_dataset.fold is not None:
-            validation_evaluator.run(val_loader)
+            train_evaluator.run(train_loader)
+        validation_evaluator.run(val_loader)
 
     # -------------------- Handlers --------------------
     # -----------------------------------------------------
