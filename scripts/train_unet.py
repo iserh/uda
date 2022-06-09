@@ -158,9 +158,9 @@ if __name__ == "__main__":
     # directories
     data_dir = Path("/tmp/data/CC359")
     config_dir = Path("config")
-    project = "UDA-CC359-Test"
+    project = "UDA-CC359"
 
-    run_id = run(config_dir, data_dir, project=project, tags=args.tags, group=None)
+    run_id = run(config_dir, data_dir, project=project, tags=args.tags, group="U-Net")
 
     from evaluate_run import evaluate_run
 
