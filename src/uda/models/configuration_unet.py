@@ -9,8 +9,9 @@ from uda.config import Config
 class UNetConfig(Config):
     """Configuration for U-Net."""
 
-    in_channels: int
     out_channels: int
     encoder_blocks: List[List[int]]
     decoder_blocks: List[List[int]]
     dim: int = 2
+    concat_hidden: bool = False
+    use_pooling: bool = False

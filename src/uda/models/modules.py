@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 
 
-class ConvModule(torch.nn.Module):
+class ConvWithNorm(nn.ModuleDict):
     """Convolution + BatchNorm + ReLU."""
 
     def __init__(
@@ -16,25 +16,29 @@ class ConvModule(torch.nn.Module):
         padding: int = 0,
         stride: int = 1,
     ) -> None:
-        super().__init__()
-        self.conv = nn.Sequential(
-            ConvNd(
-                dim=dim,
-                in_channels=in_channels,
-                out_channels=out_channels,
-                kernel_size=kernel_size,
-                padding=padding,
-                stride=stride,
-            ),
-            BatchNormNd(dim, out_channels),
-            nn.ReLU(inplace=True),
+        super().__init__(
+            {
+                "Conv": ConvNd(
+                    dim=dim,
+                    in_channels=in_channels,
+                    out_channels=out_channels,
+                    kernel_size=kernel_size,
+                    padding=padding,
+                    stride=stride,
+                ),
+                "Norm": BatchNormNd(dim, out_channels),
+                "Activation": nn.ReLU(inplace=True),
+            }
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return self.conv(x)
+        x = self.Conv(x)
+        x = self.Norm(x)
+        x = self.Activation(x)
+        return x
 
 
-class ConvBlock(nn.Module):
+class ConvBlock(nn.Sequential):
     """Convolutional block."""
 
     def __init__(self, dim: int, channels: List[int]) -> None:
@@ -42,10 +46,9 @@ class ConvBlock(nn.Module):
         `channels` : Number of channels in each convolutional layer.
         `dim` : Dimensionality of the input tensor.
         """
-        super(ConvBlock, self).__init__()
-        self.convs = nn.Sequential(
+        super(ConvBlock, self).__init__(
             *[
-                ConvModule(
+                ConvWithNorm(
                     dim=dim,
                     in_channels=in_channels,
                     out_channels=out_channels,
@@ -56,46 +59,64 @@ class ConvBlock(nn.Module):
             ]
         )
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return self.convs(x)
 
-
-class UpsampleBlock(nn.Module):
+class UpsampleBlock(nn.ModuleDict):
     """Downsampling block."""
 
-    def __init__(self, dim: int, channels: List[int]) -> None:
+    def __init__(self, dim: int, channels: List[int], cut_channels_on_upsample: bool = False) -> None:
         """Args:
         `channels` : Number of channels in each convolutional layer.
         `dim` : Dimensionality of the input tensor.
         """
-        super(UpsampleBlock, self).__init__()
-        self.block = nn.Sequential(
-            # downsampling convolution
-            ConvTransposeNd(dim=dim, in_channels=channels[0], out_channels=channels[0], kernel_size=2, stride=2),
-            ConvBlock(dim, channels),
+        super(UpsampleBlock, self).__init__(
+            {
+                "Upsample": ConvTransposeNd(
+                    dim=dim,
+                    in_channels=channels[0],
+                    out_channels=channels[0] // 2 if cut_channels_on_upsample else channels[0],
+                    kernel_size=2,
+                    stride=2,
+                ),
+                "ConvBlock": ConvBlock(dim, channels),
+            }
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return self.block(x)
+        x = self.Upsample(x)
+        x = self.ConvBlock(x)
+        return x
 
 
-class DownsampleBlock(nn.Module):
+class DownsampleBlock(nn.ModuleDict):
     """Downsampling block."""
 
-    def __init__(self, dim: int, channels: List[int]) -> None:
+    def __init__(self, dim: int, channels: List[int], use_pooling: bool = False) -> None:
         """Args:
         `channels` : Number of channels in each convolutional layer.
         `dim` : Dimensionality of the input tensor.
         """
-        super(DownsampleBlock, self).__init__()
-        self.block = nn.Sequential(
-            # downsampling convolution
-            ConvNd(dim=dim, in_channels=channels[0], out_channels=channels[0], kernel_size=2, stride=2),
-            ConvBlock(dim, channels),
+        if use_pooling:
+            downsampling = MaxPoolNd(dim=dim, kernel_size=2, stride=2)
+        else:
+            downsampling = ConvNd(
+                dim=dim,
+                in_channels=channels[0],
+                out_channels=channels[0],
+                kernel_size=2,
+                stride=2,
+            )
+
+        super(DownsampleBlock, self).__init__(
+            {
+                "Downsample": downsampling,
+                "ConvBlock": ConvBlock(dim, channels),
+            }
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return self.block(x)
+        x = self.Downsample(x)
+        x = self.ConvBlock(x)
+        return x
 
 
 def ConvNd(dim: int, *args, **kwargs) -> Union[nn.Conv1d, nn.Conv2d, nn.Conv3d]:
