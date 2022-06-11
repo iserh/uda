@@ -10,7 +10,7 @@ from uda import CC359, CC359Config, HParams, UNet, UNetConfig
 from uda.metrics import dice_score
 from uda.utils import reshape_to_volume
 
-vendors = ["PHILIPS_3", "PHILIPS_15", "SIEMENS_3", "SIEMENS_15", "GE_3", "GE_15"]
+vendors = ["GE_15", "GE_3", "SIEMENS_15", "SIEMENS_3", "PHILIPS_15", "PHILIPS_3"]
 
 
 def cross_evaluate_run(
