@@ -1,30 +1,8 @@
 from dataclasses import dataclass, field
-from enum import Enum
-from typing import Any, Dict, Optional, Type
-
-import torch
-import torch.nn as nn
+from typing import Any, Dict, Optional
 
 from .config import Config
-from .losses import _LossCriterion
-
-
-class LossCriterion(str, Enum):
-    """Supported loss functions."""
-
-    Dice = _LossCriterion.Dice.name
-    DiceBCE = _LossCriterion.DiceBCE.name
-    BCE = _LossCriterion.BCE.name
-
-
-class _Optimizer(Enum):
-    Adam = torch.optim.Adam
-
-
-class Optimizer(str, Enum):
-    """Supported loss functions."""
-
-    Adam = _Optimizer.Adam.name
+from .losses import LossCriterion, Optimizer
 
 
 @dataclass
@@ -53,9 +31,3 @@ class HParams(Config):
     sf_dice_tolerance: float = 1
     early_stopping: bool = True
     early_stopping_patience: Optional[int] = 5
-
-    def get_optimizer(self) -> Type[torch.optim.Optimizer]:
-        return _Optimizer[self.optimizer].value
-
-    def get_criterion(self) -> Type[nn.Module]:
-        return _LossCriterion[self.criterion].value(**self.loss_kwargs)

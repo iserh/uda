@@ -97,13 +97,16 @@ class VAE(nn.ModuleDict):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         mean, v_log = self.Encoder(x)
 
-        # reparametrization trick
-        eps = torch.empty_like(mean).normal_()
-        z = (v_log / 2).exp() * eps + mean
+        if self.training:
+            # reparametrization trick
+            eps = torch.empty_like(mean).normal_()
+            z = (v_log / 2).exp() * eps + mean
+        else:
+            z = mean
 
-        x = self.Decoder(z)
+        x_rec = self.Decoder(z)
 
-        return x
+        return x_rec, mean, v_log
 
     def save(self, path: str) -> None:
         torch.save(self.state_dict(), path)

@@ -1,4 +1,4 @@
-from typing import Tuple, Union
+from typing import Any, Callable, Tuple, Union
 
 import numpy as np
 import torch
@@ -20,6 +20,12 @@ def is_notebook() -> bool:
         return False
     else:  # pragma: no cover
         return True
+
+
+if is_notebook():
+    from tqdm.notebook import tqdm
+else:
+    from tqdm import tqdm
 
 
 def reshape_to_volume(
@@ -48,11 +54,40 @@ def reshape_to_volume(
     return torch.from_numpy(data) if output_type_tensor else data
 
 
+def pipe(*transforms: Callable) -> Callable:
+    def output_transform(output: Tuple[torch.Tensor, torch.Tensor]) -> Any:
+        for transform in transforms:
+            output = transform(output)
+
+        return output
+
+    return output_transform
+
+
 def binary_one_hot_output_transform(output: Tuple[torch.Tensor, torch.Tensor]) -> Tuple[torch.Tensor, torch.Tensor]:
     y_pred, y = output
     y_pred = y_pred.sigmoid().round().long()
     y_pred = to_onehot(y_pred, 2)
     return y_pred, y.long()
+
+
+def to_cpu(output: Tuple[torch.Tensor, ...]) -> Tuple[torch.Tensor, ...]:
+    return [tensor.cpu() for tensor in output]
+
+
+def pred_from_vae_output(output: Tuple[Tuple[torch.Tensor, ...], torch.Tensor]) -> Tuple[torch.Tensor, torch.Tensor]:
+    vae_output, x_true = output
+    return vae_output[0], x_true
+
+
+def distr_from_vae_output(output: Tuple[torch.Tensor, torch.Tensor]) -> Tuple[torch.Tensor, torch.Tensor]:
+    vae_output, _ = output
+    return vae_output[1:]
+
+
+def sigmoid_round(output: Tuple[torch.Tensor, torch.Tensor]) -> Tuple[torch.Tensor, torch.Tensor]:
+    y_pred, y_true = output
+    return y_pred.sigmoid().round().long(), y_true
 
 
 def flatten_output_transform(output: Tuple[torch.Tensor, torch.Tensor], dim: int = 0) -> None:

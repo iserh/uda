@@ -5,26 +5,18 @@ from typing import List, Tuple
 import nibabel as nib
 import numpy as np
 from nibabel.spatialimages import SpatialImage
+from patchify import patchify
 from sklearn.model_selection import KFold
 from sklearn.preprocessing import MinMaxScaler
 from torch.utils.data import Dataset
 
-from uda.utils import is_notebook
-
-if is_notebook():
-    from tqdm.notebook import tqdm
-else:
-    from tqdm import tqdm
-
-from patchify import patchify
+from uda.utils import tqdm
 
 from .configuration_cc359 import CC359Config
 
 
 class CC359(Dataset):
     """Dataset class for loading Calgary Campinas dataset."""
-
-    PADDING_SHAPE = (192, 256, 256)
 
     def __init__(self, data_path: str, config: CC359Config, train: bool = False) -> None:
         """Args:
@@ -36,6 +28,7 @@ class CC359(Dataset):
         self.fold = config.fold
         self.rotate = config.rotate
         self.flatten = config.flatten
+        self.imsize = config.imsize
         self.patch_size = config.patch_size
         self.clip_intensities = config.clip_intensities
         self.random_state = config.random_state
@@ -52,7 +45,7 @@ class CC359(Dataset):
         return files[indices].tolist()
 
     def pad_array(self, arr: np.ndarray, mode: str = "edge") -> np.ndarray:
-        depth, width, height = self.PADDING_SHAPE
+        depth, width, height = self.imsize
 
         # center crop image if too large
         if arr.shape[0] > depth:
@@ -84,6 +77,7 @@ class CC359(Dataset):
         files = sorted(list(images_dir.glob("*.nii.gz")))
         if self.fold is not None:
             files = self.select_fold(files)
+        # files = files[:2]
 
         scaler = MinMaxScaler()
 
@@ -116,7 +110,6 @@ class CC359(Dataset):
         data = np.stack(images)
         targets = np.stack(labels)
         spacings_mm = np.stack(spacings_mm)
-        self.imsize = self.PADDING_SHAPE
 
         # patchify the data
         if self.patch_size is not None:

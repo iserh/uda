@@ -18,7 +18,8 @@ def cross_evaluate_run(
     project: str,
     data_dir: Path = Path("/tmp/data/CC359"),
     files_dir: Path = Path("/tmp/files"),
-    save_predictions: bool = False,
+    save_predictions: bool = True,
+    n_predictions: int = 5,
 ) -> None:
     run = wandb.init(project=project, id=run_id, resume=True)
 
@@ -34,6 +35,9 @@ def cross_evaluate_run(
     dataset_config: CC359Config = CC359Config.from_file(files_dir / "config/cc359.yaml")
     hparams: HParams = HParams.from_file(files_dir / "config/hparams.yaml")
 
+    model = UNet.from_pretrained(files_dir / "best_model.pt", unet_config)
+    model.eval().to(device)
+
     dataset_config.fold = None
 
     print(f"\nCross Evaluating run {run_id}\n")
@@ -44,10 +48,6 @@ def cross_evaluate_run(
 
         dataset = CC359(data_dir, dataset_config)
         data_loader = torch.utils.data.DataLoader(dataset, batch_size=hparams.val_batch_size, shuffle=False)
-
-        model = UNet.from_pretrained(files_dir / "best_model.pt", unet_config)
-
-        model.eval().to(device)
 
         with torch.no_grad():
             preds, targets = [
@@ -65,8 +65,6 @@ def cross_evaluate_run(
         preds = reshape_to_volume(preds, dataset.imsize, dataset.patch_size)
         targets = reshape_to_volume(targets, dataset.imsize, dataset.patch_size)
         data = reshape_to_volume(dataset.data, dataset.imsize, dataset.patch_size)
-
-        model.cpu()
 
         class_labels = {1: "Skull"}
         slice_index = dataset.imsize[0] // 2
@@ -98,7 +96,8 @@ def cross_evaluate_run(
                 },
             )
 
-            table.add_data(i, run.name, dice, surface_dice, wandb_img)
+            if i < n_predictions:
+                table.add_data(i, run.name, dice, surface_dice, wandb_img)
 
         dice_mean = np.array(table.get_column("Dice")).mean()
         surface_dice_mean = np.array(table.get_column("Surface Dice")).mean()

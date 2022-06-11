@@ -25,12 +25,19 @@ _bg +cmd:
     conda activate uda && \
     {{cmd}}
 
-train pool_nr:
-    ssh -t pool-u-042-{{pool_nr}} ". ~/.bashrc; cd {{justfile_directory()}}; tmux new-session -d -s 'train-session' 'just _train'"
-_train:
+train-u pool_nr:
+    ssh -t pool-u-042-{{pool_nr}} ". ~/.bashrc; cd {{justfile_directory()}}; tmux new-session -d -s 'train-session' 'just _train-u'"
+_train-u:
     eval "$(conda shell.bash hook)" && \
     conda activate uda && \
     python scripts/train_unet.py;
+
+train-v pool_nr:
+    ssh -t pool-u-042-{{pool_nr}} ". ~/.bashrc; cd {{justfile_directory()}}; tmux new-session -d -s 'train-session' 'just _train-v'"
+_train-v:
+    eval "$(conda shell.bash hook)" && \
+    conda activate uda && \
+    python scripts/train_vae.py;
 
 def_session := "train-session"
 kill pool_nr session_name=def_session:

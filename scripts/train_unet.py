@@ -13,6 +13,7 @@ from torch.utils.data import DataLoader
 
 from uda import HParams, UNet, UNetConfig
 from uda.datasets import CC359, CC359Config
+from uda.losses import loss_fn, optimizer_cls
 from uda.utils import binary_one_hot_output_transform
 
 
@@ -59,8 +60,8 @@ def run(config_dir: Path, data_dir: Path, project: str, tags: List[str] = [], gr
     print(f"Using device: {device}")
 
     model.to(device)  # Move model before creating optimizer
-    optimizer = hparams.get_optimizer()(model.parameters(), lr=hparams.learning_rate)
-    criterion = hparams.get_criterion()
+    optimizer = optimizer_cls(hparams.optimizer)(model.parameters(), lr=hparams.learning_rate)
+    criterion = loss_fn(hparams.criterion)(**hparams.loss_kwargs)
 
     # metrics
     cm = ConfusionMatrix(num_classes=2, output_transform=binary_one_hot_output_transform)
@@ -165,7 +166,7 @@ if __name__ == "__main__":
 
     from evaluate_run import evaluate_run
 
-    evaluate_run(run_id, project=project, save_predictions=False)
+    evaluate_run(run_id, project=project, save_predictions=True)
 
     # from cross_evaluate_run import cross_evaluate_run
 

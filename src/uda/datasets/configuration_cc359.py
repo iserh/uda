@@ -21,6 +21,7 @@ class CC359Config(Config):
     fold: Optional[int] = None
     rotate: Optional[int] = 1
     flatten: bool = False
+    imsize: Tuple[int, int, int] = (192, 256, 256)
     patch_size: Optional[Tuple[int, int, int]] = None
     clip_intensities: Optional[Tuple[int, int]] = None
     random_state: Optional[int] = None

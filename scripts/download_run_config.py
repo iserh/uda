@@ -8,7 +8,14 @@ def restore_config(run_id: str, project: str, root: Path = Path.cwd()) -> None:
 
     wandb.restore("config/cc359.yaml", f"tiser/{project}/{run_id}", root=root, replace=True)
     wandb.restore("config/hparams.yaml", f"tiser/{project}/{run_id}", root=root, replace=True)
-    wandb.restore("config/unet.yaml", f"tiser/{project}/{run_id}", root=root, replace=True)
+    try:
+        wandb.restore("config/unet.yaml", f"tiser/{project}/{run_id}", root=root, replace=True)
+    except Exception:
+        pass
+    try:
+        wandb.restore("config/vae.yaml", f"tiser/{project}/{run_id}", root=root, replace=True)
+    except Exception:
+        pass
 
 
 if __name__ == "__main__":
