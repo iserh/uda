@@ -18,13 +18,13 @@ class VAELoss(nn.Module):
         self,
         rec_loss: LossCriterion,
         rec_loss_kwargs: Dict[str, Any] = {},
-        lamda: float = 1.0,
+        beta: float = 1.0,
         return_sum: bool = False,
     ) -> None:
         super(VAELoss, self).__init__()
-        self.lamda = lamda
+        self.beta = beta
         self.rec_loss_fn = _LossCriterion[rec_loss].value(**rec_loss_kwargs)
-        self.kl_loss_fn = KLLoss(lamda)
+        self.kl_loss_fn = KLLoss(beta)
         self.return_sum = return_sum
 
     def forward(self, out: Tuple[torch.Tensor, ...], x_true: torch.Tensor) -> torch.Tensor:
@@ -34,18 +34,18 @@ class VAELoss(nn.Module):
         kl_l = self.kl_loss_fn(mean, v_log)
 
         if self.return_sum:
-            return rec_l + self.lamda * kl_l
+            return rec_l + self.beta * kl_l
         else:
-            return rec_l, self.lamda * kl_l
+            return rec_l, self.beta * kl_l
 
 
 class KLLoss(nn.Module):
-    def __init__(self, lamda: float = 1.0) -> None:
+    def __init__(self, beta: float = 1.0) -> None:
         super(KLLoss, self).__init__()
-        self.lamda = lamda
+        self.beta = beta
 
     def forward(self, mean: torch.Tensor, v_log: torch.Tensor) -> torch.Tensor:
-        return self.lamda * kl_loss(mean, v_log)
+        return self.beta * kl_loss(mean, v_log)
 
 
 class DiceWithLogitsLoss(nn.Module):
