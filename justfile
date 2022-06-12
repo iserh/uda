@@ -18,6 +18,11 @@ reinstall:
 remote-reinstall pool_nr:
     ssh -t pool-u-042-{{pool_nr}} ". ~/.bashrc; cd {{justfile_directory()}}; tmux new-session -d -s 'install-session' 'just reinstall'"
 
+download project run_id:
+    eval "$(conda shell.bash hook)" && \
+    conda activate uda && \
+    python scripts/download_run_config.py {{project}} {{run_id}}
+
 bg +cmd:
     tmux new-session -d -s "bg-session" "just _bg {{cmd}}"
 _bg +cmd:

@@ -37,7 +37,7 @@ def run(config_dir: Path, data_dir: Path, project: str, tags: List[str] = [], gr
         },
     )
 
-    run.save(str(config_dir / "*"), policy="now")
+    run.save(str(config_dir / "*"), base_path=str(config_dir.parent), policy="now")
     run.save(str(Path(__file__)), policy="now")
 
     cc359 = run.use_artifact("tiser/UDA-Datasets/CC359-Skull-stripping:latest")
@@ -152,6 +152,8 @@ def run(config_dir: Path, data_dir: Path, project: str, tags: List[str] = [], gr
 
 if __name__ == "__main__":
     from argparse import ArgumentParser
+    from tempfile import TemporaryDirectory
+    import shutil
 
     parser = ArgumentParser()
     parser.add_argument("-t", "--tags", nargs="+", default=[])
@@ -162,7 +164,14 @@ if __name__ == "__main__":
     config_dir = Path("config")
     project = "UDA-CC359"
 
-    run_id = run(config_dir, data_dir, project=project, tags=args.tags, group="U-Net")
+    with TemporaryDirectory() as tmpdir:
+        (tmpdir / "config").mkdir()
+
+        shutil.copy(config_dir / "cc359.yaml", tmpdir / "config")
+        shutil.copy(config_dir / "hparams.yaml", tmpdir / "config")
+        shutil.copy(config_dir / "vae.yaml", tmpdir / "config")
+
+        run_id = run(tmpdir / "config", data_dir, project=project, tags=args.tags, group="U-Net")
 
     from evaluate_run import evaluate_run
 
