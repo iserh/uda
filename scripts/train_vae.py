@@ -175,7 +175,7 @@ def run(config_dir: Path, data_dir: Path, project: str, tags: List[str] = [], gr
 
         try:
             old_artifact = run.use_artifact(f"run-{run.id}-validation_results:latest")
-            old_artifact.delete()
+            old_artifact.delete(delete_aliases=True)
         except Exception:
             pass
 
