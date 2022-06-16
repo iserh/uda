@@ -10,6 +10,7 @@ remote-install pool_nr:
     ssh -t pool-u-042-{{pool_nr}} ". ~/.bashrc; cd {{justfile_directory()}}; tmux new-session -d -s 'install-session' 'just install'"
 
 reinstall:
+    rm -rf /tmp/conda/envs/uda
     eval "$(conda shell.bash hook)" && \
     conda create -n uda python=3.9 -y && \
     conda activate uda && \
