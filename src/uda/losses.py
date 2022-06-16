@@ -111,10 +111,21 @@ def kl_loss(mean: torch.Tensor, v_log: torch.Tensor) -> torch.Tensor:
     return (v_log.exp() + mean**2 - 1 - v_log).mean()
 
 
+class MSEWithLogitsLoss(nn.Module):
+    def __init__(self, *args, **kwargs) -> None:
+        super(MSEWithLogitsLoss, self).__init__()
+        self.mse_loss = nn.MSELoss(*args, **kwargs)
+
+    def forward(self, y_pred: torch.Tensor, y_true: torch.Tensor) -> torch.Tensor:
+        return self.mse_loss(y_pred.sigmoid(), y_true)
+
+
+
 class _LossCriterion(Enum):
     Dice = DiceWithLogitsLoss
     DiceBCE = DiceBCEWithLogitsLoss
     BCE = nn.BCEWithLogitsLoss
+    MSE = MSEWithLogitsLoss
     VAELoss = VAELoss
 
 
@@ -124,6 +135,7 @@ class LossCriterion(str, Enum):
     Dice = _LossCriterion.Dice.name
     DiceBCE = _LossCriterion.DiceBCE.name
     BCE = _LossCriterion.BCE.name
+    MSE = _LossCriterion.MSE.name
     VAELoss = _LossCriterion.VAELoss.name
 
 

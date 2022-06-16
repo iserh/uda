@@ -83,7 +83,8 @@ def run(config_dir: Path, data_dir: Path, project: str, tags: List[str] = [], gr
     vae_config: VAEConfig = VAEConfig.from_file(config_dir / "vae.yaml")
     hparams: HParams = HParams.from_file(config_dir / "hparams.yaml")
 
-    run_name = f"VAE-{vae_config.dim}D-{dataset_config.vendor}"
+    # run_name = f"VAE-{vae_config.dim}D-{dataset_config.vendor}"
+    run_name = f"VAE-{vae_config.dim}D-{hparams.loss_kwargs['rec_loss']}-Large"
     run = wandb.init(
         project=project,
         tags=tags,
@@ -102,9 +103,10 @@ def run(config_dir: Path, data_dir: Path, project: str, tags: List[str] = [], gr
     cc359 = run.use_artifact("tiser/UDA-Datasets/CC359-Skull-stripping:latest")
     data_dir = cc359.download(root=data_dir)
 
-    dataset = CC359(data_dir, dataset_config, train=True)
-    train_loader = DataLoader(dataset.targets, batch_size=hparams.train_batch_size, shuffle=True)
-    val_loader = DataLoader(dataset.targets, batch_size=hparams.val_batch_size, shuffle=False)
+    train_dataset = CC359(data_dir, dataset_config, train=True)
+    val_dataset = CC359(data_dir, dataset_config, train=False)
+    train_loader = DataLoader(train_dataset.targets, batch_size=hparams.train_batch_size, shuffle=True)
+    val_loader = DataLoader(val_dataset.targets, batch_size=hparams.val_batch_size, shuffle=False)
 
     # -------------------- model, loss, metrics --------------------
 
@@ -146,12 +148,12 @@ def run(config_dir: Path, data_dir: Path, project: str, tags: List[str] = [], gr
         preds = torch.cat(preds).numpy()
         targets = torch.cat(targets).numpy()
 
-        preds = reshape_to_volume(preds, dataset.imsize, dataset.patch_size)
-        targets = reshape_to_volume(targets, dataset.imsize, dataset.patch_size)
-        data = reshape_to_volume(dataset.data, dataset.imsize, dataset.patch_size)
+        preds = reshape_to_volume(preds, val_dataset.imsize, val_dataset.patch_size)
+        targets = reshape_to_volume(targets, val_dataset.imsize, val_dataset.patch_size)
+        data = reshape_to_volume(val_dataset.data, val_dataset.imsize, val_dataset.patch_size)
 
         class_labels = {1: "Skull"}
-        slice_index = dataset.imsize[0] // 2
+        slice_index = val_dataset.imsize[0] // 2
 
         table = wandb.Table(columns=["ID", "Name", "Dice", "Surface Dice", "Image"])
 
@@ -199,7 +201,7 @@ def run(config_dir: Path, data_dir: Path, project: str, tags: List[str] = [], gr
         output_transform=lambda out: {"batch_rec_loss": out[0], "batch_kl_loss": out[1]},
     )
 
-    for tag, evaluator, metr in [("training", evaluator, metrics)]:
+    for tag, evaluator, metr in [("validation", evaluator, metrics)]:
         wandb_logger.attach_output_handler(
             evaluator,
             event_name=Events.EPOCH_COMPLETED,
