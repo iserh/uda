@@ -84,7 +84,7 @@ def run(config_dir: Path, data_dir: Path, project: str, tags: List[str] = [], gr
     hparams: HParams = HParams.from_file(config_dir / "hparams.yaml")
 
     # run_name = f"VAE-{vae_config.dim}D-{dataset_config.vendor}"
-    run_name = f"VAE-{vae_config.dim}D-{hparams.loss_kwargs['rec_loss']}-Large"
+    run_name = f"VAE-{vae_config.dim}D-{hparams.loss_kwargs['rec_loss']}"
     run = wandb.init(
         project=project,
         tags=tags,
