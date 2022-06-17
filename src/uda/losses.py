@@ -24,28 +24,18 @@ class VAELoss(nn.Module):
         super(VAELoss, self).__init__()
         self.beta = beta
         self.rec_loss_fn = _LossCriterion[rec_loss].value(**rec_loss_kwargs)
-        self.kl_loss_fn = KLLoss(beta)
         self.return_sum = return_sum
 
     def forward(self, out: Tuple[torch.Tensor, ...], x_true: torch.Tensor) -> torch.Tensor:
         x_rec, mean, v_log = out
 
-        rec_l = self.rec_loss_fn(x_rec, x_true)  # * np.prod(cc359_dataset.imsize)
-        kl_l = self.kl_loss_fn(mean, v_log)
+        rec_l = self.rec_loss_fn(x_rec, x_true)
+        kl_l = kl_loss(mean, v_log)
 
         if self.return_sum:
             return rec_l + self.beta * kl_l
         else:
             return rec_l, self.beta * kl_l
-
-
-class KLLoss(nn.Module):
-    def __init__(self, beta: float = 1.0) -> None:
-        super(KLLoss, self).__init__()
-        self.beta = beta
-
-    def forward(self, mean: torch.Tensor, v_log: torch.Tensor) -> torch.Tensor:
-        return self.beta * kl_loss(mean, v_log)
 
 
 class DiceWithLogitsLoss(nn.Module):
@@ -78,12 +68,21 @@ class DiceWithLogitsLoss(nn.Module):
 
 class DiceBCEWithLogitsLoss(nn.Module):
     def __init__(self, *args, **kwargs) -> None:
-        super().__init__()
+        super(DiceBCEWithLogitsLoss, self).__init__()
         self.dice_loss = DiceWithLogitsLoss(*args, **kwargs)
         self.bce_loss = nn.BCEWithLogitsLoss()
 
     def forward(self, y_pred: torch.Tensor, y_true: torch.Tensor) -> torch.Tensor:
         return self.bce_loss(y_pred, y_true) + self.dice_loss(y_pred, y_true)
+
+
+class MSEWithLogitsLoss(nn.Module):
+    def __init__(self, *args, **kwargs) -> None:
+        super(MSEWithLogitsLoss, self).__init__()
+        self.mse_loss = nn.MSELoss(*args, **kwargs)
+
+    def forward(self, y_pred: torch.Tensor, y_true: torch.Tensor) -> torch.Tensor:
+        return self.mse_loss(y_pred.sigmoid(), y_true)
 
 
 def dice_loss(
@@ -109,16 +108,6 @@ def dice_loss(
 
 def kl_loss(mean: torch.Tensor, v_log: torch.Tensor) -> torch.Tensor:
     return (v_log.exp() + mean**2 - 1 - v_log).mean()
-
-
-class MSEWithLogitsLoss(nn.Module):
-    def __init__(self, *args, **kwargs) -> None:
-        super(MSEWithLogitsLoss, self).__init__()
-        self.mse_loss = nn.MSELoss(*args, **kwargs)
-
-    def forward(self, y_pred: torch.Tensor, y_true: torch.Tensor) -> torch.Tensor:
-        return self.mse_loss(y_pred.sigmoid(), y_true)
-
 
 
 class _LossCriterion(Enum):

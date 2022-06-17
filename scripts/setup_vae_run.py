@@ -18,8 +18,8 @@ dataset_config.save(config_dir / "cc359.yaml")
 
 hparams = HParams(
     epochs=80,
-    criterion=LossCriterion.VAELoss,
-    loss_kwargs={"rec_loss": LossCriterion.MSE, "beta": 1.0},
+    criterion=LossCriterion.MSE,
+    vae_beta=1.0,
     learning_rate=1e-4,
     optimizer=Optimizer.Adam,
     train_batch_size=2,

@@ -14,7 +14,7 @@ from torch.utils.data import DataLoader
 
 from uda import VAE, HParams, VAEConfig
 from uda.datasets import CC359, CC359Config
-from uda.losses import loss_fn, optimizer_cls
+from uda.losses import kl_loss, loss_fn, optimizer_cls
 from uda.metrics import dice_score
 from uda.utils import (
     binary_one_hot_output_transform,
@@ -24,14 +24,14 @@ from uda.utils import (
     reshape_to_volume,
     to_cpu,
     sigmoid_round,
-    tqdm
 )
 
 
 def vae_trainer(
     model: torch.nn.Module,
     optimizer: torch.optim.Optimizer,
-    loss_fn: Union[Callable, torch.nn.Module],
+    rec_loss_fn: Union[Callable, torch.nn.Module],
+    beta: float = 1,
     device: Optional[Union[str, torch.device]] = None,
     non_blocking: bool = False,
 ) -> Engine:
@@ -40,10 +40,12 @@ def vae_trainer(
         model.train()
 
         x = convert_tensor(batch, device, non_blocking)
-        output = model(x)
+        x_rec, mean, v_log = model(x)
 
-        rec_l, kl_l = loss_fn(output, x)
-        loss = kl_l + rec_l
+        rec_l = rec_loss_fn(x_rec, x)
+        kl_l = kl_loss(mean, v_log)
+        loss = beta * kl_l + rec_l
+
         loss.backward()
         optimizer.step()
 
@@ -84,7 +86,7 @@ def run(config_dir: Path, data_dir: Path, project: str, tags: List[str] = [], gr
     hparams: HParams = HParams.from_file(config_dir / "hparams.yaml")
 
     # run_name = f"VAE-{vae_config.dim}D-{dataset_config.vendor}"
-    run_name = f"VAE-{vae_config.dim}D-{hparams.loss_kwargs['rec_loss']}"
+    run_name = f"VAE-{vae_config.dim}D-{hparams.criterion}"
     run = wandb.init(
         project=project,
         tags=tags,
@@ -120,17 +122,17 @@ def run(config_dir: Path, data_dir: Path, project: str, tags: List[str] = [], gr
 
     model.to(device)  # Move model before creating optimizer
     optimizer = optimizer_cls(hparams.optimizer)(model.parameters(), lr=hparams.learning_rate)
-    criterion = loss_fn(hparams.criterion)(**hparams.loss_kwargs)
+    rec_criterion = loss_fn(hparams.criterion)(**hparams.loss_kwargs)
 
     # metrics
-    rec_loss_metric = Loss(criterion.rec_loss_fn, output_transform=pred_from_vae_output)
-    kl_loss_metric = Loss(criterion.kl_loss_fn, output_transform=distr_from_vae_output)
+    rec_loss_metric = Loss(rec_criterion, output_transform=pred_from_vae_output)
+    kl_loss_metric = Loss(kl_loss, output_transform=distr_from_vae_output)
     cm = ConfusionMatrix(num_classes=2, output_transform=pipe(pred_from_vae_output, binary_one_hot_output_transform))
     metrics = {"dice": DiceCoefficient(cm, ignore_index=0), "rec_loss": rec_loss_metric, "kl_loss": kl_loss_metric}
 
     # -------------------- trainer & evaluators --------------------
 
-    trainer = vae_trainer(model, optimizer, criterion, device=device)
+    trainer = vae_trainer(model, optimizer, rec_criterion, beta=hparams.vae_beta, device=device)
     trainer.logger = setup_logger("Trainer")
 
     evaluator = vae_evaluator(model, metrics=metrics, device=device)

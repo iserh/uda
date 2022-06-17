@@ -31,3 +31,4 @@ class HParams(Config):
     sf_dice_tolerance: float = 1
     early_stopping: bool = True
     early_stopping_patience: Optional[int] = 5
+    vae_beta: float = 1

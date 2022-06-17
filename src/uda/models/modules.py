@@ -16,7 +16,7 @@ class ConvWithNorm(nn.ModuleDict):
         padding: int = 0,
         stride: int = 1,
     ) -> None:
-        super().__init__(
+        super(ConvWithNorm, self).__init__(
             {
                 "Conv": ConvNd(
                     dim=dim,
