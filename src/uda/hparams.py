@@ -19,6 +19,7 @@ class HParams(Config):
     `sf_dice_tolerance`: Tolerance value for surface dice
     `early_stopping`: Use early stopping
     `early_stopping_patience`: Number of epochs to wait before early stopping
+    `vae_beta`: Beta value for KL loss
     """
 
     epochs: int = 10
@@ -28,7 +29,7 @@ class HParams(Config):
     train_batch_size: int = 1
     val_batch_size: int = 1
     loss_kwargs: Optional[Dict[str, Any]] = field(default_factory=dict)
-    sf_dice_tolerance: float = 1
-    early_stopping: bool = True
-    early_stopping_patience: Optional[int] = 5
-    vae_beta: float = 1
+    sf_dice_tolerance: Optional[float] = None
+    early_stopping: Optional[bool] = None
+    early_stopping_patience: Optional[int] = None
+    vae_beta: Optional[float] = None

@@ -19,7 +19,8 @@ class Config:
 
     def save(self, path: str) -> None:
         with open(path, "w") as f:
-            yaml.dump(self.__dict__, f, Dumper=EnumDumper)
+            dict_wo_nones = {k: v for k, v in self.__dict__.items() if v is not None}
+            yaml.dump(dict_wo_nones, f, Dumper=EnumDumper)
 
     @classmethod
     def from_file(cls, path: str) -> "Config":

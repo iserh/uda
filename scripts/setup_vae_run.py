@@ -18,14 +18,13 @@ dataset_config.save(config_dir / "cc359.yaml")
 
 hparams = HParams(
     epochs=80,
-    criterion=LossCriterion.MSE,
-    vae_beta=1.0,
-    learning_rate=1e-4,
+    criterion=LossCriterion.BCE,
     optimizer=Optimizer.Adam,
+    learning_rate=1e-4,
     train_batch_size=2,
     val_batch_size=2,
-    early_stopping=False,
-    early_stopping_patience=None,
+    sf_dice_tolerance=1.0,
+    vae_beta=1.0,
 )
 hparams.save(config_dir / "hparams.yaml")
 
