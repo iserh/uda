@@ -1,13 +1,13 @@
 _default:
     just --list
 
+remote nr cmd:
+    ssh -t pool-u-042-{{nr}} ". ~/.bashrc; cd {{justfile_directory()}}; tmux new-session -d -s 'remote-session' 'just {{cmd}}'"
+
 install:
     eval "$(conda shell.bash hook)" && \
     conda activate uda && \
     poetry install
-
-remote-install pool_nr:
-    ssh -t pool-u-042-{{pool_nr}} ". ~/.bashrc; cd {{justfile_directory()}}; tmux new-session -d -s 'install-session' 'just install'"
 
 reinstall:
     rm -rf /tmp/conda/envs/uda
@@ -16,10 +16,7 @@ reinstall:
     conda activate uda && \
     poetry install
 
-remote-reinstall pool_nr:
-    ssh -t pool-u-042-{{pool_nr}} ". ~/.bashrc; cd {{justfile_directory()}}; tmux new-session -d -s 'install-session' 'just reinstall'"
-
-download project run_id:
+dl project run_id:
     eval "$(conda shell.bash hook)" && \
     conda activate uda && \
     python scripts/download_run_config.py {{project}} {{run_id}}
@@ -31,29 +28,29 @@ _bg +cmd:
     conda activate uda && \
     {{cmd}}
 
-train-u pool_nr:
-    ssh -t pool-u-042-{{pool_nr}} ". ~/.bashrc; cd {{justfile_directory()}}; tmux new-session -d -s 'train-session' 'just _train-u'"
-_train-u:
+train-unet nr:
+    ssh -t pool-u-042-{{nr}} ". ~/.bashrc; cd {{justfile_directory()}}; tmux new-session -d -s 'train-session' 'just _train-unet'"
+_train-unet:
     eval "$(conda shell.bash hook)" && \
     conda activate uda && \
     python scripts/train_unet.py;
 
-train-v pool_nr:
-    ssh -t pool-u-042-{{pool_nr}} ". ~/.bashrc; cd {{justfile_directory()}}; tmux new-session -d -s 'train-session' 'just _train-v'"
-_train-v:
+train-vae nr:
+    ssh -t pool-u-042-{{nr}} ". ~/.bashrc; cd {{justfile_directory()}}; tmux new-session -d -s 'train-session' 'just _train-vae'"
+_train-vae:
     eval "$(conda shell.bash hook)" && \
     conda activate uda && \
     python scripts/train_vae.py;
 
 def_session := "train-session"
-kill pool_nr session_name=def_session:
-    ssh -t pool-u-042-{{pool_nr}} "tmux send-keys -t '{{session_name}}' 'C-c'"
+kill nr session_name=def_session:
+    ssh -t pool-u-042-{{nr}} "tmux send-keys -t '{{session_name}}' 'C-c'"
 
-ssh pool_nr:
-    ssh pool-u-042-{{pool_nr}}
+ssh nr:
+    ssh pool-u-042-{{nr}}
 
-list-sessions pool_nr:
-    ssh -t pool-u-042-{{pool_nr}} "tmux ls"
+list-sessions nr:
+    ssh -t pool-u-042-{{nr}} "tmux ls"
 
-list-envs pool_nr:
-    ssh -t pool-u-042-{{pool_nr}} ". ~/.bashrc; conda env list"
+list-envs nr:
+    ssh -t pool-u-042-{{nr}} ". ~/.bashrc; conda env list"
