@@ -22,8 +22,8 @@ from uda.utils import (
     pipe,
     pred_from_vae_output,
     reshape_to_volume,
-    to_cpu,
     sigmoid_round,
+    to_cpu,
 )
 
 
@@ -200,7 +200,7 @@ def run(config_dir: Path, data_dir: Path, project: str, tags: List[str] = [], gr
         trainer,
         event_name=Events.ITERATION_COMPLETED,
         tag="training",
-        output_transform=lambda out: {"batch_rec_loss": out[0], "batch_kl_loss": out[1]},
+        output_transform=lambda out: {"rec_batchloss": out[0], "kl_batchloss": out[1]},
     )
 
     for tag, evaluator, metr in [("validation", evaluator, metrics)]:
@@ -252,9 +252,9 @@ def run(config_dir: Path, data_dir: Path, project: str, tags: List[str] = [], gr
 
 
 if __name__ == "__main__":
+    import shutil
     from argparse import ArgumentParser
     from tempfile import TemporaryDirectory
-    import shutil
 
     parser = ArgumentParser()
     parser.add_argument("-t", "--tags", nargs="+", default=[])

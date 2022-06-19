@@ -4,13 +4,13 @@ import numpy as np
 import torch
 import wandb
 from surface_distance import compute_surface_dice_at_tolerance, compute_surface_distances
+from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from uda import CC359, CC359Config, HParams, VAEConfig
 from uda.metrics import dice_score
 from uda.models.modeling_vae import VAE
 from uda.utils import reshape_to_volume
-from torch.utils.data import DataLoader
 
 
 def evaluate_vae(

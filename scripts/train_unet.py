@@ -151,9 +151,9 @@ def run(config_dir: Path, data_dir: Path, project: str, tags: List[str] = [], gr
 
 
 if __name__ == "__main__":
+    import shutil
     from argparse import ArgumentParser
     from tempfile import TemporaryDirectory
-    import shutil
 
     parser = ArgumentParser()
     parser.add_argument("-t", "--tags", nargs="+", default=[])
