@@ -164,11 +164,12 @@ if __name__ == "__main__":
     project = "UDA-CC359"
 
     with TemporaryDirectory() as tmpdir:
+        tmpdir = Path(tmpdir)
         (tmpdir / "config").mkdir()
 
         shutil.copy(config_dir / "cc359.yaml", tmpdir / "config")
         shutil.copy(config_dir / "hparams.yaml", tmpdir / "config")
-        shutil.copy(config_dir / "vae.yaml", tmpdir / "config")
+        shutil.copy(config_dir / "unet.yaml", tmpdir / "config")
 
         run_id = run(tmpdir / "config", data_dir, project=project, tags=args.tags, group="U-Net")
 
