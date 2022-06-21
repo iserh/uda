@@ -24,7 +24,6 @@ def run(config_dir: Path, data_dir: Path, project: str, tags: List[str] = [], gr
     hparams: HParams = HParams.from_file(config_dir / "hparams.yaml")
 
     run_name = f"UNet-{unet_config.dim}D-{dataset_config.vendor}"
-    # run_name = f"UNet-{unet_config.dim}D-{hparams.criterion}"
     run = wandb.init(
         project=project,
         tags=tags,
@@ -177,10 +176,10 @@ if __name__ == "__main__":
 
     evaluate_run(run_id, project=project, save_predictions=True)
 
-    # from cross_evaluate_run import cross_evaluate_run
+    from cross_evaluate_run import cross_evaluate_run
 
-    # cross_evaluate_run(run_id, project=project, save_predictions=True)
+    cross_evaluate_run(run_id, project=project, save_predictions=True)
 
-    from delete_model_binaries import delete_model_binaries
+    # from delete_model_binaries import delete_model_binaries
 
-    delete_model_binaries(run_id, project=project)
+    # delete_model_binaries(run_id, project=project)

@@ -38,8 +38,6 @@ def cross_evaluate_run(
     model = UNet.from_pretrained(files_dir / "best_model.pt", unet_config)
     model.eval().to(device)
 
-    dataset_config.fold = None
-
     print(f"\nCross Evaluating run {run_id}\n")
     for vendor in vendors:
         print(f"\nEVALUATING VENDOR - {vendor} -\n")
