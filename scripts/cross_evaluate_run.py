@@ -67,7 +67,7 @@ def cross_evaluate_run(
         class_labels = {1: "Skull"}
         slice_index = dataset.imsize[0] // 2
 
-        table = wandb.Table(columns=["ID", "Name", "Dice", "Surface Dice", "Image"])
+        table = wandb.Table(columns=["ID", "Dim", "Criterion", "Dice", "Surface Dice", "Image"])
 
         for i, (y_pred, y_true, x, spacing_mm) in tqdm(
             enumerate(zip(preds, targets, data, dataset.spacings_mm)),
@@ -95,12 +95,18 @@ def cross_evaluate_run(
             )
 
             if i < n_predictions:
-                table.add_data(i, run.name, dice, surface_dice, wandb_img)
+                table.add_data(i, run.config.model["dim"], run.config.hparams["criterion"], dice, surface_dice, wandb_img)
 
         dice_mean = np.array(table.get_column("Dice")).mean()
         surface_dice_mean = np.array(table.get_column("Surface Dice")).mean()
 
         if save_predictions:
+            try:
+                old_artifact = run.use_artifact(f"run-{run.id}-{dataset.vendor}_results:latest")
+                old_artifact.delete(delete_aliases=True)
+            except Exception:
+                pass
+
             run.log({f"{dataset.vendor}_results": table})
 
         run.summary[f"{dataset.vendor}_dice"] = dice_mean

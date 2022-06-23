@@ -58,7 +58,7 @@ def evaluate_vae(
     class_labels = {1: "Skull"}
     slice_index = dataset.imsize[0] // 2
 
-    table = wandb.Table(columns=["ID", "Name", "Dice", "Surface Dice", "Image"])
+    table = wandb.Table(columns=["ID", "Dim", "Criterion", "Beta", "Model Size", "Dice", "Surface Dice", "Image"])
 
     for i, (x_rec, x_true, img, spacing_mm) in tqdm(
         enumerate(zip(preds, targets, data, dataset.spacings_mm)),
@@ -86,12 +86,18 @@ def evaluate_vae(
         )
 
         if i < n_predictions:
-            table.add_data(i, run.name, dice, surface_dice, wandb_img)
+            table.add_data(i, run.config.model["dim"], run.config.hparams["criterion"], run.config.hparams["vae_beta"], run.summary["model_size"], dice, surface_dice, wandb_img)
 
     dice_mean = np.array(table.get_column("Dice")).mean()
     surface_dice_mean = np.array(table.get_column("Surface Dice")).mean()
 
     if save_predictions:
+        try:
+            old_artifact = run.use_artifact(f"run-{run.id}-validation_results:latest")
+            old_artifact.delete(delete_aliases=True)
+        except Exception:
+            pass
+
         run.log({"validation_results": table})
 
     run.summary["validation/dice"] = dice_mean
