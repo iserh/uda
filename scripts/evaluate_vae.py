@@ -86,7 +86,16 @@ def evaluate_vae(
         )
 
         if i < n_predictions:
-            table.add_data(i, str(run.config.model["dim"]), run.config.hparams["criterion"], str(run.config.hparams["vae_beta"]), run.summary["model_size"], dice, surface_dice, wandb_img)
+            table.add_data(
+                i,
+                str(run.config.model["dim"]),
+                run.config.hparams["criterion"],
+                str(run.config.hparams["vae_beta"]),
+                run.summary["model_size"],
+                dice,
+                surface_dice,
+                wandb_img,
+            )
 
     dice_mean = np.array(table.get_column("Dice")).mean()
     surface_dice_mean = np.array(table.get_column("Surface Dice")).mean()

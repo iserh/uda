@@ -172,7 +172,16 @@ def run(config_dir: Path, data_dir: Path, project: str, tags: List[str] = [], gr
             )
 
             if i < 5:
-                table.add_data(i, str(run.config.model["dim"]), run.config.hparams["criterion"], str(run.config.hparams["vae_beta"]), run.summary["model_size"], dice, "-", wandb_img)
+                table.add_data(
+                    i,
+                    str(run.config.model["dim"]),
+                    run.config.hparams["criterion"],
+                    str(run.config.hparams["vae_beta"]),
+                    run.summary["model_size"],
+                    dice,
+                    "-",
+                    wandb_img,
+                )
 
         try:
             old_artifact = run.use_artifact(f"run-{run.id}-validation_results:latest")
