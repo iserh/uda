@@ -154,7 +154,7 @@ def run(config_dir: Path, data_dir: Path, project: str, tags: List[str] = [], gr
         class_labels = {1: "Skull"}
         slice_index = val_dataset.imsize[0] // 2
 
-        table = wandb.Table(columns=["ID", "Name", "Dice", "Surface Dice", "Image"])
+        table = wandb.Table(columns=["ID", "Dim", "Criterion", "Beta", "Model Size", "Dice", "Surface Dice", "Image"])
 
         for i in range(5):
             dice = dice_score(preds[i], targets[i])
@@ -172,7 +172,7 @@ def run(config_dir: Path, data_dir: Path, project: str, tags: List[str] = [], gr
             )
 
             if i < 5:
-                table.add_data(i, run.name, dice, "-", wandb_img)
+                table.add_data(i, str(run.config.model["dim"]), run.config.hparams["criterion"], str(run.config.hparams["vae_beta"]), run.summary["model_size"], dice, surface_dice, wandb_img)
 
         try:
             old_artifact = run.use_artifact(f"run-{run.id}-validation_results:latest")
