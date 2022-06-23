@@ -26,10 +26,10 @@ def cross_evaluate_run(
     device = "cuda:0" if torch.cuda.is_available() else "cpu"
     print(f"Using device: {device}")
 
-    wandb.restore("config/cc359.yaml", f"tiser/{project}/{run_id}", root=files_dir, replace=True)
-    wandb.restore("config/hparams.yaml", f"tiser/{project}/{run_id}", root=files_dir, replace=True)
-    wandb.restore("config/unet.yaml", f"tiser/{project}/{run_id}", root=files_dir, replace=True)
-    wandb.restore("best_model.pt", f"tiser/{project}/{run_id}", root=files_dir, replace=True)
+    wandb.restore("config/cc359.yaml", f"iserh/{project}/{run_id}", root=files_dir, replace=True)
+    wandb.restore("config/hparams.yaml", f"iserh/{project}/{run_id}", root=files_dir, replace=True)
+    wandb.restore("config/unet.yaml", f"iserh/{project}/{run_id}", root=files_dir, replace=True)
+    wandb.restore("best_model.pt", f"iserh/{project}/{run_id}", root=files_dir, replace=True)
 
     unet_config: UNetConfig = UNetConfig.from_file(files_dir / "config/unet.yaml")
     dataset_config: CC359Config = CC359Config.from_file(files_dir / "config/cc359.yaml")

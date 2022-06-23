@@ -4,7 +4,7 @@ import wandb
 def delete_model_binaries(run_id: str, project: str) -> None:
     api = wandb.Api()
 
-    run = api.run(f"tiser/{project}/{run_id}")
+    run = api.run(f"iserh/{project}/{run_id}")
 
     model_file = run.file("best_model.pt")
     if model_file.size != 0:

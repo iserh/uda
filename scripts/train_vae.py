@@ -102,7 +102,7 @@ def run(config_dir: Path, data_dir: Path, project: str, tags: List[str] = [], gr
     run.save(str(config_dir / "*"), base_path=str(config_dir.parent), policy="now")
     run.save(str(Path(__file__)), policy="now")
 
-    cc359 = run.use_artifact("tiser/UDA-Datasets/CC359-Skull-stripping:latest")
+    cc359 = run.use_artifact("iserh/UDA-Datasets/CC359-Skull-stripping:latest")
     data_dir = cc359.download(root=data_dir)
 
     train_dataset = CC359(data_dir, dataset_config, train=True)
