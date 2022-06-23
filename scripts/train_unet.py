@@ -23,12 +23,10 @@ def run(config_dir: Path, data_dir: Path, project: str, tags: List[str] = [], gr
     unet_config: UNetConfig = UNetConfig.from_file(config_dir / "unet.yaml")
     hparams: HParams = HParams.from_file(config_dir / "hparams.yaml")
 
-    run_name = f"UNet-{unet_config.dim}D-{dataset_config.vendor}"
     run = wandb.init(
         project=project,
         tags=tags,
         group=group,
-        name=run_name,
         config={
             "hparams": hparams.__dict__,
             "dataset": dataset_config.__dict__,
