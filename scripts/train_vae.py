@@ -113,6 +113,7 @@ def run(config_dir: Path, data_dir: Path, project: str, tags: List[str] = [], gr
 
     n_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     run.summary.update({"n_parameters": n_params})
+    run.summary.update({"model_size": "Large" if len(vae_config.encoder_blocks) == 6 else "Small"})
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
