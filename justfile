@@ -1,8 +1,8 @@
 _default:
     just --list
 
-remote cmd nr pool="042":
-    ssh -t pool-u-{{pool}}-{{nr}} ". ~/.bashrc; cd {{justfile_directory()}}; tmux new-session -d -s 'remote-session' 'just {{cmd}}'"
+remote cmd server:
+    ssh -t {{server}} ". ~/.bashrc; cd {{justfile_directory()}}; tmux new-session -d -s 'remote-session' 'just {{cmd}}'"
 
 install:
     eval "$(conda shell.bash hook)" && \
@@ -28,28 +28,28 @@ _bg +cmd:
     conda activate uda && \
     {{cmd}}
 
-train-unet nr pool="042":
-    ssh -t pool-u-{{pool}}-{{nr}} ". ~/.bashrc; cd {{justfile_directory()}}; tmux new-session -d -s 'train-session' 'just _train-unet'"
+train-unet server:
+    ssh -t {{server}} ". ~/.bashrc; cd {{justfile_directory()}}; tmux new-session -d -s 'train-session' 'just _train-unet'"
 _train-unet:
     eval "$(conda shell.bash hook)" && \
     conda activate uda && \
     python scripts/train_unet.py;
 
-train-vae nr pool="042":
-    ssh -t pool-u-{{pool}}-{{nr}} ". ~/.bashrc; cd {{justfile_directory()}}; tmux new-session -d -s 'train-session' 'just _train-vae'"
+train-vae server:
+    ssh -t {{server}} ". ~/.bashrc; cd {{justfile_directory()}}; tmux new-session -d -s 'train-session' 'just _train-vae'"
 _train-vae:
     eval "$(conda shell.bash hook)" && \
     conda activate uda && \
     python scripts/train_vae.py;
 
-kill nr pool="042" session_name="train-session":
-    ssh -t pool-u-{{pool}}-{{nr}} "tmux send-keys -t '{{session_name}}' 'C-c'"
+kill server session_name="train-session":
+    ssh -t {{server}} "tmux send-keys -t '{{session_name}}' 'C-c'"
 
-ssh nr pool="042":
-    ssh pool-u-{{pool}}-{{nr}}
+ssh server:
+    ssh {{server}}
 
-list-sessions nr pool="042":
-    ssh -t pool-u-{{pool}}-{{nr}} "tmux ls"
+list-sessions server:
+    ssh -t {{server}} "tmux ls"
 
-list-envs nr pool="042":
-    ssh -t pool-u-{{pool}}-{{nr}} ". ~/.bashrc; conda env list"
+list-envs server:
+    ssh -t {{server}} ". ~/.bashrc; conda env list"
