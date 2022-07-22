@@ -110,7 +110,7 @@ def kl_loss(mean: torch.Tensor, v_log: torch.Tensor) -> torch.Tensor:
     return (v_log.exp() + mean**2 - 1 - v_log).mean()
 
 
-class _LossCriterion(Enum):
+class _LossCriterion(Enum):  # noqa: F811
     Dice = DiceWithLogitsLoss
     DiceBCE = DiceBCEWithLogitsLoss
     BCE = nn.BCEWithLogitsLoss

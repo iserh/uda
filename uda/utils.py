@@ -23,9 +23,9 @@ def is_notebook() -> bool:
 
 
 if is_notebook():
-    from tqdm.notebook import tqdm
+    from tqdm.notebook import tqdm  # noqa: F401
 else:
-    from tqdm import tqdm
+    from tqdm import tqdm  # noqa: F401
 
 
 def reshape_to_volume(

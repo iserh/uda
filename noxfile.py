@@ -9,7 +9,6 @@ nox.options.sessions = (
     "format",
     "lint",
 )  # set sessions for default call
-nox.options.reuse_existing_virtualenvs = True  # -r option as default
 
 locations = "uda", "tests", "scripts", "noxfile.py"
 
@@ -21,23 +20,26 @@ max_line_length = config["flake8"]["max-line-length"]
 
 @nox.session(python=False)
 def lint(session: Session) -> None:
-    session.install(
-        "flake8",
-        "flake8-annotations",
-        "flake8-bugbear",
-        "flake8-builtins",
-        "flake8-isort",
-        "flake8-use-fstring",
-    )
-
     args = session.posargs or locations
+
+    # session.install(
+    #     "flake8",
+    #     "flake8-annotations",
+    #     "flake8-bugbear",
+    #     "flake8-builtins",
+    #     "flake8-isort",
+    #     "flake8-use-fstring",
+    # )
+
     session.run("flake8", *args)
 
 
 @nox.session(python=False)
 def format(session: Session) -> None:
     args = session.posargs or locations
-    session.install("black", "isort", "docformatter", "reindent", "tomlkit")
+
+    # session.install("black", "isort", "docformatter", "reindent", "tomlkit", "toml-sort")
+
     session.run("isort", "--atomic", *args)
     session.run(
         "docformatter",
@@ -50,11 +52,12 @@ def format(session: Session) -> None:
         *args,
     )
     session.run("python", "-m", "reindent", "-r", "-n", *args)
-    session.run("poetry", "run", "python", "pyproject_sort.py", external=True)
     session.run("black", "--line-length", f"{max_line_length}", *args)
+    session.run("toml-sort", "-i", "-a", "pyproject.toml")
 
 
 @nox.session(python=False)
 def depsort(session: Session) -> None:
-    session.install("tomlkit")
-    session.run("poetry", "run", "python", "pyproject_sort.py", external=True)
+    # session.install("toml-sort")
+
+    session.run("toml-sort", "-i", "-a", "pyproject.toml")
