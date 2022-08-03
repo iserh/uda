@@ -1,4 +1,7 @@
 """U-Net implementation."""
+from pathlib import Path
+from typing import Union
+
 import torch
 import torch.nn as nn
 
@@ -84,10 +87,18 @@ class UNet(nn.ModuleDict):
         return x
 
     def save(self, path: str) -> None:
-        torch.save(self.state_dict(), path)
+        torch.save(
+            {
+                "config": self.config,
+                "state_dict": self.state_dict(),
+            },
+            path,
+        )
 
     @classmethod
-    def from_pretrained(cls, path: str, config: UNetConfig) -> "UNet":
-        model = cls(config)
-        model.load_state_dict(torch.load(path))
+    def from_pretrained(cls, path: Union[Path, str]) -> "UNet":
+        model_dict = torch.load(path)
+        model = cls(model_dict["config"])
+        model.load_state_dict(model_dict["state_dict"])
+
         return model

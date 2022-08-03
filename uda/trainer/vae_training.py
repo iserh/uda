@@ -16,6 +16,7 @@ from uda.utils import binary_one_hot_output_transform, pipe
 
 
 class VaeEvaluator(BaseEvaluator):
+    @torch.no_grad()
     def step(self, batch: tuple[torch.Tensor, ...]) -> tuple[torch.Tensor, ...]:
         self.model.eval()
 

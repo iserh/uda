@@ -17,7 +17,6 @@ class HParams(Config):
     `train_batch_size`: Batch Size for validation
     `loss_kwargs`: Additional arguments for loss function
     `sf_dice_tolerance`: Tolerance value for surface dice
-    `early_stopping`: Use early stopping
     `early_stopping_patience`: Number of epochs to wait before early stopping
     `vae_beta`: Beta value for KL loss
     """
@@ -30,6 +29,6 @@ class HParams(Config):
     val_batch_size: int = 1
     loss_kwargs: Optional[dict[str, Any]] = field(default_factory=dict)
     sf_dice_tolerance: Optional[float] = None
-    early_stopping: Optional[bool] = None
     early_stopping_patience: Optional[int] = None
     vae_beta: Optional[float] = None
+    vae_lamdb: Optional[float] = None

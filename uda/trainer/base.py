@@ -18,6 +18,7 @@ class BaseEvaluator(Engine, ABC):
         self.logger = setup_logger(self.__class__.__name__)
         self.model = model
 
+    @torch.no_grad()
     @abstractmethod
     def step(self, batch: tuple[torch.Tensor, ...]) -> tuple[torch.Tensor, ...]:
         ...
@@ -36,6 +37,7 @@ class BaseTrainer(Engine, ABC):
         score_function: Optional[Callable[[Engine], float]] = None,
         cache_dir: Path = Path("/tmp/model-cache"),
         Evaluator: type[BaseEvaluator] = BaseEvaluator,
+        evaluator_args: tuple[Any] = [],
     ):
         super(BaseTrainer, self).__init__(type(self).step)
         self.logger = setup_logger(self.__class__.__name__)
@@ -45,12 +47,12 @@ class BaseTrainer(Engine, ABC):
 
         # Evaluation on train data
         if train_loader is not None:
-            self.train_evaluator = Evaluator(model)
+            self.train_evaluator = Evaluator(model, *evaluator_args)
             self.add_event_handler(Events.EPOCH_COMPLETED, lambda: self.train_evaluator.run(train_loader))
 
         # Evaluation on validation data
         if val_loader is not None:
-            self.val_evaluator = Evaluator(model)
+            self.val_evaluator = Evaluator(model, *evaluator_args)
             self.add_event_handler(Events.EPOCH_COMPLETED, lambda: self.val_evaluator.run(val_loader))
 
         # metrics

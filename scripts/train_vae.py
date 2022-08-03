@@ -82,7 +82,7 @@ def run_with_wandb(dataset: CC359, hparams: HParams, model_config: VAEConfig):
 
     # wandb table evaluation
     trainer.add_event_handler(
-        event_name=Events.COMPLETED,
+        event_name=Events.EPOCH_COMPLETED,
         handler=vae_table_plot,
         evaluator=trainer.val_evaluator,
         data=dataset.val_split.tensors[0],

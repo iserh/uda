@@ -134,7 +134,7 @@ def ConvTransposeNd(dim: int, *args, **kwargs) -> Union[nn.ConvTranspose1d, nn.C
 def BatchNormNd(dim: int, *args, **kwargs) -> Union[nn.BatchNorm1d, nn.BatchNorm2d, nn.BatchNorm3d]:
     assert dim > 0 and dim < 4, "Attribute 'dim' has to be >0 and <4."
     cls = getattr(nn, f"BatchNorm{dim}d")
-    return cls(*args, **kwargs)
+    return cls(*args, **kwargs, track_running_stats=False)
 
 
 def MaxPoolNd(dim: int, *args, **kwargs) -> Union[nn.MaxPool1d, nn.MaxPool2d, nn.MaxPool3d]:

@@ -1,9 +1,15 @@
 """Unsupervised Domain Adaptation - WandB integrations."""
 from importlib.metadata import version
 
-from .evaluation import vae_table_plot, evaluate_vae, evaluate_unet, cross_evaluate_unet  # noqa: F401
 from .delete import delete_model_binaries  # noqa: F401
 from .download import download_configuration, download_dataset  # noqa: F401
+from .evaluation import (  # noqa: F401
+    cross_evaluate_unet,
+    evaluate_unet,
+    evaluate_vae,
+    segmentation_table_plot,
+    vae_table_plot,
+)
 
 try:
     __version__ = version(__name__)

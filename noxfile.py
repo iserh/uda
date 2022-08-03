@@ -10,7 +10,7 @@ nox.options.sessions = (
     "lint",
 )  # set sessions for default call
 
-locations = "uda", "tests", "scripts", "noxfile.py"
+locations = "uda", "uda_wandb", "tests", "scripts", "noxfile.py"
 
 # load line length from flake8 config
 config = configparser.ConfigParser()

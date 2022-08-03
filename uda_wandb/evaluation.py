@@ -1,21 +1,21 @@
 """Evaluation functions for wandb."""
+from pathlib import Path
 from tempfile import TemporaryDirectory
-from uda.trainer import VaeEvaluator
-from uda.utils import reshape_to_volume
-from uda.metrics import dice_score
-import wandb
+
+import ignite.distributed as idist
 import numpy as np
 import torch
-from pathlib import Path
-
 import wandb
 from surface_distance import compute_surface_dice_at_tolerance, compute_surface_distances
 from tqdm import tqdm
 
 from uda import HParams, reshape_to_volume
-from uda.models import VAEConfig, VAE, UNetConfig, UNet
 from uda.datasets import CC359
-import ignite.distributed as idist
+from uda.metrics import dice_score
+from uda.models import VAE, UNet, UNetConfig, VAEConfig
+from uda.trainer import VaeEvaluator
+from uda.utils import reshape_to_volume
+
 from .download import download_dataset
 
 vendors = ["GE_15", "GE_3", "SIEMENS_15", "SIEMENS_3", "PHILIPS_15", "PHILIPS_3"]
@@ -45,7 +45,12 @@ def evaluate_vae(run_id: str, project: str, team: str = "iserh", table_plot: boo
 
     with torch.no_grad():
         preds, g_truths = [
-            *zip(*[(model(x.to(idist.device()))[0].sigmoid().round().cpu(), x) for x, _ in tqdm(data_loader, desc="Predicting")])
+            *zip(
+                *[
+                    (model(x.to(idist.device()))[0].sigmoid().round().cpu(), x)
+                    for x, _ in tqdm(data_loader, desc="Predicting")
+                ]
+            )
         ]
 
     preds = torch.cat(preds).numpy()
@@ -68,10 +73,12 @@ def evaluate_vae(run_id: str, project: str, team: str = "iserh", table_plot: boo
         desc="Computing Scores",
     ):
         all_dice.append(dice_score(x_rec, x_true))
-        all_sdice.append(compute_surface_dice_at_tolerance(
-            compute_surface_distances(x_true.astype(bool), x_rec.astype(bool), spacing_mm),
-            tolerance_mm=hparams.sf_dice_tolerance,
-        ))
+        all_sdice.append(
+            compute_surface_dice_at_tolerance(
+                compute_surface_distances(x_true.astype(bool), x_rec.astype(bool), spacing_mm),
+                tolerance_mm=hparams.sf_dice_tolerance,
+            )
+        )
 
         if table_plot and i < table_size:
             # the raw background image as a numpy array
@@ -140,7 +147,12 @@ def evaluate_unet(run_id: str, project: str, team: str = "iserh", table_plot: bo
 
     with torch.no_grad():
         preds, targets = [
-            *zip(*[(model(x.to(idist.device())).sigmoid().round().cpu(), y) for x, y in tqdm(data_loader, desc="Predicting")])
+            *zip(
+                *[
+                    (model(x.to(idist.device())).sigmoid().round().cpu(), y)
+                    for x, y in tqdm(data_loader, desc="Predicting")
+                ]
+            )
         ]
 
     preds = torch.cat(preds).numpy()
@@ -163,10 +175,12 @@ def evaluate_unet(run_id: str, project: str, team: str = "iserh", table_plot: bo
         desc="Computing Scores",
     ):
         all_dice.append(dice_score(y_pred, y_true))
-        all_sdice.append(compute_surface_dice_at_tolerance(
-            compute_surface_distances(y_true.astype(bool), y_pred.astype(bool), spacing_mm),
-            tolerance_mm=hparams.sf_dice_tolerance,
-        ))
+        all_sdice.append(
+            compute_surface_dice_at_tolerance(
+                compute_surface_distances(y_true.astype(bool), y_pred.astype(bool), spacing_mm),
+                tolerance_mm=hparams.sf_dice_tolerance,
+            )
+        )
 
         if table_plot and i < table_size:
             # the raw background image as a numpy array
@@ -209,7 +223,9 @@ def evaluate_unet(run_id: str, project: str, team: str = "iserh", table_plot: bo
     wandb.finish()
 
 
-def cross_evaluate_unet(run_id: str, project: str, team: str = "iserh", table_plot: bool = True, table_size: int = 5) -> None:
+def cross_evaluate_unet(
+    run_id: str, project: str, team: str = "iserh", table_plot: bool = True, table_size: int = 5
+) -> None:
     print(f"Cross evaluating run {run_id}\n")
     run = wandb.init(project=project, id=run_id, resume=True)
 
@@ -237,7 +253,12 @@ def cross_evaluate_unet(run_id: str, project: str, team: str = "iserh", table_pl
 
         with torch.no_grad():
             preds, targets = [
-                *zip(*[(model(x.to(idist.device())).sigmoid().round().cpu(), y) for x, y in tqdm(data_loader, desc="Predicting")])
+                *zip(
+                    *[
+                        (model(x.to(idist.device())).sigmoid().round().cpu(), y)
+                        for x, y in tqdm(data_loader, desc="Predicting")
+                    ]
+                )
             ]
 
         preds = torch.cat(preds).numpy()
@@ -260,10 +281,12 @@ def cross_evaluate_unet(run_id: str, project: str, team: str = "iserh", table_pl
             desc="Computing Scores",
         ):
             all_dice.append(dice_score(y_pred, y_true))
-            all_sdice.append(compute_surface_dice_at_tolerance(
-                compute_surface_distances(y_true.astype(bool), y_pred.astype(bool), spacing_mm),
-                tolerance_mm=hparams.sf_dice_tolerance,
-            ))
+            all_sdice.append(
+                compute_surface_dice_at_tolerance(
+                    compute_surface_distances(y_true.astype(bool), y_pred.astype(bool), spacing_mm),
+                    tolerance_mm=hparams.sf_dice_tolerance,
+                )
+            )
 
             if table_plot and i < table_size:
                 # the raw background image as a numpy array
@@ -313,6 +336,7 @@ def vae_table_plot(
     patch_size: tuple[int, int, int],
     table_size: int = 5,
 ):
+    print("Creating VAE reconstruction table")
     preds, targets = [*zip(*evaluator.state.output)]
 
     preds = torch.cat(preds).numpy()
@@ -360,6 +384,71 @@ def vae_table_plot(
             wandb.config.hparams["criterion"],
             str(wandb.config.hparams["vae_beta"]),
             wandb.summary["model_size"],
+            dice,
+            "-",
+            wandb_img,
+        )
+
+    try:
+        old_artifact = wandb.use_artifact(f"run-{wandb.run.id}-validation_results:latest")
+        old_artifact.delete(delete_aliases=True)
+    except Exception:
+        pass
+
+    wandb.log({"validation_results": table})
+
+
+def segmentation_table_plot(
+    evaluator: VaeEvaluator,
+    data: torch.Tensor,
+    imsize: tuple[int, int, int],
+    patch_size: tuple[int, int, int],
+    table_size: int = 5,
+):
+    print("Creating Segmentation prediction table")
+    preds, targets = [*zip(*evaluator.state.output)]
+
+    preds = torch.cat(preds).numpy()
+    targets = torch.cat(targets).numpy()
+    data = data.numpy()
+
+    preds = reshape_to_volume(preds, imsize, patch_size)
+    targets = reshape_to_volume(targets, imsize, patch_size)
+    data = reshape_to_volume(data, imsize, patch_size)
+
+    class_labels = {1: "Foreground"}
+    slice_index = imsize[0] // 2
+
+    table = wandb.Table(
+        columns=[
+            "ID",
+            "Dim",
+            "Criterion",
+            "Dice",
+            "Surface Dice",
+            "Image",
+        ]
+    )
+
+    for i in range(min(table_size, preds.shape[0])):
+        dice = dice_score(preds[i], targets[i])
+        # the raw background image as a numpy array
+        img = (data[i][slice_index] * 255).astype(np.uint8)
+        y_pred = preds[i][slice_index].astype(np.uint8)
+        y_true = targets[i][slice_index].astype(np.uint8)
+
+        wandb_img = wandb.Image(
+            img,
+            masks={
+                "prediction": {"mask_data": y_pred, "class_labels": class_labels},
+                "ground truth": {"mask_data": y_true, "class_labels": class_labels},
+            },
+        )
+
+        table.add_data(
+            i,
+            str(wandb.config.model["dim"]),
+            wandb.config.hparams["criterion"],
             dice,
             "-",
             wandb_img,

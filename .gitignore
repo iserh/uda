@@ -1,6 +1,7 @@
 # folders
 **/.DS_Store
 **/__pycache__
+**/.ipynb_checkpoints
 .nox
 .pytest_cache
 .vscode

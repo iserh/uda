@@ -35,11 +35,9 @@ class CC359:
     def from_preconfigured(
         cls, config: Union[CC359Config, Path, str], root: str = "/tmp/data/CC359-Skull-stripping"
     ) -> "CC359":
-        if isinstance(config, CC359Config):
-            cfg = config
-        else:
-            cfg = CC359Config.from_file(config)
-        return cls(root, cfg)
+        if not isinstance(config, CC359Config):
+            config = CC359Config.from_file(config)
+        return cls(root, config)
 
     def setup(self) -> None:
         images_dir = self.root / "Original" / self.config.vendor
@@ -47,7 +45,7 @@ class CC359:
 
         # sorted is absolutely crucial here:
         # we cannot expect that files are downloaded in the same order on each system
-        files = sorted(list(images_dir.glob("*.nii.gz")))[:9]
+        files = sorted(list(images_dir.glob("*.nii.gz")))
 
         scaler = MinMaxScaler()
 
