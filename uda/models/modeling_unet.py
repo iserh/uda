@@ -1,6 +1,4 @@
 """U-Net implementation."""
-from typing import List, Tuple
-
 import torch
 import torch.nn as nn
 
@@ -11,7 +9,7 @@ from .modules import ConvBlock, ConvNd, DownsampleBlock, UpsampleBlock, init_wei
 class UNetEncoder(nn.ModuleDict):
     """Encoder part of U-Net."""
 
-    def __init__(self, dim: int, blocks: Tuple[Tuple[int, ...]], use_pooling: bool = False) -> None:
+    def __init__(self, dim: int, blocks: tuple[tuple[int, ...]], use_pooling: bool = False) -> None:
         super(UNetEncoder, self).__init__(
             {
                 "InBlock": ConvBlock(dim, blocks[0]),
@@ -36,7 +34,7 @@ class UNetDecoder(nn.ModuleDict):
     """Decoder part of U-Net."""
 
     def __init__(
-        self, dim: int, out_channels: int, blocks: Tuple[Tuple[int, ...]], concat_hidden: bool = False
+        self, dim: int, out_channels: int, blocks: tuple[tuple[int, ...]], concat_hidden: bool = False
     ) -> None:
         super(UNetDecoder, self).__init__(
             {
@@ -53,7 +51,7 @@ class UNetDecoder(nn.ModuleDict):
 
         self.concat_hidden = concat_hidden
 
-    def forward(self, x: torch.Tensor, hidden_states: List[torch.Tensor]) -> torch.Tensor:
+    def forward(self, x: torch.Tensor, hidden_states: list[torch.Tensor]) -> torch.Tensor:
         for block, h in zip(self.UpsampleBlocks, reversed(hidden_states)):
             if self.concat_hidden:
                 x = block.Upsample(x)

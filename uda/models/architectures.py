@@ -1,5 +1,4 @@
 from math import log2
-from typing import Tuple
 
 from .configuration_unet import UNetConfig
 from .configuration_vae import VAEConfig
@@ -63,7 +62,7 @@ def uda_unet(
 
 
 def uda_vae(
-    input_size: Tuple[int, ...],
+    input_size: tuple[int, ...],
     in_channels: int,
     latent_dim: int = 1024,
     n_blocks: int = 6,

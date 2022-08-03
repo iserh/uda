@@ -1,6 +1,5 @@
 """U-Net configuration."""
 from dataclasses import dataclass
-from typing import Tuple
 
 from uda.config import Config
 
@@ -9,9 +8,9 @@ from uda.config import Config
 class VAEConfig(Config):
     """Configuration for Variational Autoencoder."""
 
-    input_size: Tuple[int, ...]
-    encoder_blocks: Tuple[Tuple[int, ...], ...]
-    decoder_blocks: Tuple[Tuple[int, ...], ...]
+    input_size: tuple[int, ...]
+    encoder_blocks: tuple[tuple[int, ...], ...]
+    decoder_blocks: tuple[tuple[int, ...], ...]
     latent_dim: int = 1024
     dim: int = 2
     use_pooling: bool = False

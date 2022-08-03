@@ -1,6 +1,4 @@
 """U-Net implementation."""
-from typing import Tuple
-
 import numpy as np
 import torch
 import torch.nn as nn
@@ -15,9 +13,9 @@ class VAEEncoder(nn.ModuleDict):
     def __init__(
         self,
         dim: int,
-        input_size: Tuple[int, ...],
+        input_size: tuple[int, ...],
         latent_dim: int,
-        blocks: Tuple[Tuple[int, ...]],
+        blocks: tuple[tuple[int, ...]],
         use_pooling: bool = False,
     ) -> None:
         hidden_size = [blocks[-1][-1]] + [size // (2 ** len(blocks[1:])) for size in input_size]
@@ -33,7 +31,7 @@ class VAEEncoder(nn.ModuleDict):
             }
         )
 
-    def forward(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+    def forward(self, x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         x = self.InBlock(x)
         x = self.DownsampleBlocks(x)
         x = x.flatten(1)
@@ -48,7 +46,7 @@ class VAEDecoder(nn.ModuleDict):
     """Dencoder part of Variational Autoencoder."""
 
     def __init__(
-        self, dim: int, out_channels: int, output_size: Tuple[int, ...], latent_dim: int, blocks: Tuple[Tuple[int, ...]]
+        self, dim: int, out_channels: int, output_size: tuple[int, ...], latent_dim: int, blocks: tuple[tuple[int, ...]]
     ) -> None:
         self.hidden_size = [blocks[0][0]] + [size // (2 ** len(blocks)) for size in output_size]
 

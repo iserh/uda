@@ -1,4 +1,4 @@
-from typing import List, Tuple, Union
+from typing import Union
 
 import torch
 import torch.nn as nn
@@ -12,7 +12,7 @@ class ConvWithNorm(nn.ModuleDict):
         dim: int,
         in_channels: int,
         out_channels: int,
-        kernel_size: Union[int, Tuple[int, ...]],
+        kernel_size: Union[int, tuple[int, ...]],
         padding: int = 0,
         stride: int = 1,
     ) -> None:
@@ -41,7 +41,7 @@ class ConvWithNorm(nn.ModuleDict):
 class ConvBlock(nn.Sequential):
     """Convolutional block."""
 
-    def __init__(self, dim: int, channels: List[int]) -> None:
+    def __init__(self, dim: int, channels: list[int]) -> None:
         """Args:
         `channels` : Number of channels in each convolutional layer.
         `dim` : Dimensionality of the input tensor.
@@ -63,7 +63,7 @@ class ConvBlock(nn.Sequential):
 class UpsampleBlock(nn.ModuleDict):
     """Downsampling block."""
 
-    def __init__(self, dim: int, channels: List[int], cut_channels_on_upsample: bool = False) -> None:
+    def __init__(self, dim: int, channels: list[int], cut_channels_on_upsample: bool = False) -> None:
         """Args:
         `channels` : Number of channels in each convolutional layer.
         `dim` : Dimensionality of the input tensor.
@@ -90,7 +90,7 @@ class UpsampleBlock(nn.ModuleDict):
 class DownsampleBlock(nn.ModuleDict):
     """Downsampling block."""
 
-    def __init__(self, dim: int, channels: List[int], use_pooling: bool = False) -> None:
+    def __init__(self, dim: int, channels: list[int], use_pooling: bool = False) -> None:
         """Args:
         `channels` : Number of channels in each convolutional layer.
         `dim` : Dimensionality of the input tensor.

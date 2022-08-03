@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
 from .config import Config
 from .losses import LossCriterion, Optimizer
@@ -28,7 +28,7 @@ class HParams(Config):
     learning_rate: float = 1e-4
     train_batch_size: int = 1
     val_batch_size: int = 1
-    loss_kwargs: Optional[Dict[str, Any]] = field(default_factory=dict)
+    loss_kwargs: Optional[dict[str, Any]] = field(default_factory=dict)
     sf_dice_tolerance: Optional[float] = None
     early_stopping: Optional[bool] = None
     early_stopping_patience: Optional[int] = None

@@ -1,16 +1,15 @@
 """Loader for the Calgary Campinas dataset."""
 from pathlib import Path
-from typing import List, Tuple, Union
+from typing import Union
 
 import nibabel as nib
 import numpy as np
 import torch
-import wandb
 from nibabel.spatialimages import SpatialImage
 from patchify import patchify
 from sklearn.model_selection import KFold
 from sklearn.preprocessing import MinMaxScaler
-from torch.utils.data import DataLoader, Dataset, TensorDataset
+from torch.utils.data import DataLoader, TensorDataset
 from tqdm import tqdm
 
 from .configuration_cc359 import CC359Config
@@ -18,6 +17,8 @@ from .configuration_cc359 import CC359Config
 
 class CC359:
     """Calgary Campinas data module."""
+
+    artifact_name = "iserh/UDA-Datasets/CC359-Skull-stripping:latest"
 
     def __init__(self, root: str, config: CC359Config) -> None:
         """Args:
@@ -39,13 +40,6 @@ class CC359:
         else:
             cfg = CC359Config.from_file(config)
         return cls(root, cfg)
-
-    def prepare_data(self) -> None:
-        """Downloads the dataset from `wandb.ai`."""
-        # donwload latest version of dataset
-        api = wandb.Api()
-        artifact = api.artifact("iserh/UDA-Datasets/CC359-Skull-stripping:latest")
-        artifact.download(root=self.root)
 
     def setup(self) -> None:
         images_dir = self.root / "Original" / self.config.vendor

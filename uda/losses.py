@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Any, Dict, Tuple, Type
+from typing import Any
 
 import torch
 import torch.nn as nn
@@ -17,7 +17,7 @@ class VAELoss(nn.Module):
     def __init__(
         self,
         rec_loss: LossCriterion,
-        rec_loss_kwargs: Dict[str, Any] = {},
+        rec_loss_kwargs: dict[str, Any] = {},
         beta: float = 1.0,
         return_sum: bool = False,
     ) -> None:
@@ -26,7 +26,7 @@ class VAELoss(nn.Module):
         self.rec_loss_fn = _LossCriterion[rec_loss].value(**rec_loss_kwargs)
         self.return_sum = return_sum
 
-    def forward(self, output: Tuple[torch.Tensor, ...], x_true: torch.Tensor) -> torch.Tensor:
+    def forward(self, output: tuple[torch.Tensor, ...], x_true: torch.Tensor) -> torch.Tensor:
         x_rec, mean, v_log = output
 
         rec_l = self.rec_loss_fn(x_rec, x_true)
@@ -138,9 +138,9 @@ class Optimizer(str, Enum):
     Adam = _Optimizer.Adam.name
 
 
-def get_criterion(criterion_name: str) -> Type[nn.Module]:
+def get_criterion(criterion_name: str) -> type[nn.Module]:
     return _LossCriterion[criterion_name].value
 
 
-def optimizer_cls(optimizer_name: str) -> Type[torch.optim.Optimizer]:
+def optimizer_cls(optimizer_name: str) -> type[torch.optim.Optimizer]:
     return _Optimizer[optimizer_name].value

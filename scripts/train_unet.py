@@ -14,7 +14,6 @@ from uda.trainer import SegTrainer, segmentation_standard_metrics
 
 
 def run(dataset: CC359, hparams: HParams, model_config: UNetConfig) -> None:
-    dataset.prepare_data()
     dataset.setup()
 
     model = UNet(model_config).to(idist.device())
@@ -38,7 +37,6 @@ def run(dataset: CC359, hparams: HParams, model_config: UNetConfig) -> None:
 
 
 def run_with_wandb(dataset: CC359, hparams: HParams, model_config: UNetConfig) -> None:
-    dataset.prepare_data()
     dataset.setup()
 
     model = UNet(model_config).to(idist.device())
@@ -88,8 +86,10 @@ def run_with_wandb(dataset: CC359, hparams: HParams, model_config: UNetConfig) -
 
 if __name__ == "__main__":
     from tempfile import TemporaryDirectory
+
     from commons import get_args
-    from uda_wandb import delete_model_binaries, evaluate_unet, cross_evaluate_unet
+
+    from uda_wandb import cross_evaluate_unet, delete_model_binaries, download_dataset, evaluate_unet
 
     args = get_args()
 
@@ -97,6 +97,7 @@ if __name__ == "__main__":
     hparams = HParams.from_file(args.config / "hparams.yaml")
     model_config = UNetConfig.from_file(args.config / "unet.yaml")
     dataset = CC359.from_preconfigured(args.config / "cc359.yaml", root=args.data)
+    download_dataset(dataset)
 
     if args.wandb:
         r = wandb.init(

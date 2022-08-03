@@ -1,8 +1,8 @@
 """Unsupervised Domain Adaptation."""
 from importlib.metadata import version
 
-from .hparams import HParams, LossCriterion, Optimizer  # noqa: F401
 from .config import Config  # noqa: F401
+from .hparams import HParams, LossCriterion, Optimizer  # noqa: F401
 from .losses import get_criterion, optimizer_cls  # noqa: F401
 from .utils import (  # noqa: F401
     binary_one_hot_output_transform,

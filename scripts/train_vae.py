@@ -16,7 +16,6 @@ from uda_wandb import vae_table_plot
 
 
 def run(dataset: CC359, hparams: HParams, model_config: VAEConfig):
-    dataset.prepare_data()
     dataset.setup()
 
     model = VAE(model_config).to(idist.device())
@@ -40,7 +39,6 @@ def run(dataset: CC359, hparams: HParams, model_config: VAEConfig):
 
 
 def run_with_wandb(dataset: CC359, hparams: HParams, model_config: VAEConfig):
-    dataset.prepare_data()
     dataset.setup()
 
     model = VAE(model_config).to(idist.device())
@@ -107,7 +105,7 @@ if __name__ == "__main__":
 
     from commons import get_args
 
-    from uda_wandb import delete_model_binaries, evaluate_vae
+    from uda_wandb import delete_model_binaries, download_dataset, evaluate_vae
 
     args = get_args()
 
@@ -115,6 +113,7 @@ if __name__ == "__main__":
     hparams = HParams.from_file(args.config / "hparams.yaml")
     model_config = VAEConfig.from_file(args.config / "vae.yaml")
     dataset = CC359.from_preconfigured(args.config / "cc359.yaml", root=args.data)
+    download_dataset(dataset)
 
     if args.wandb:
         r = wandb.init(

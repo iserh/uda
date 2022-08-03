@@ -19,6 +19,12 @@ def download_configuration(run_id: str, project: str, config_dir: str = "config"
         pass
 
 
+def download_dataset(dataset: type, path: str = "/tmp/data/CC359-Skull-stripping") -> None:
+    api = wandb.Api()
+    artifact = api.artifact(dataset.artifact_name)
+    artifact.download(root=path)
+
+
 if __name__ == "__main__":
     from argparse import ArgumentParser
 

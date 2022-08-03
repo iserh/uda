@@ -1,4 +1,4 @@
-from typing import Optional, Tuple, Union
+from typing import Optional, Union
 
 import numpy as np
 import torch
@@ -12,8 +12,8 @@ from .utils import flatten_output_transform, reshape_to_volume
 class DiceScore(EpochMetric):
     def __init__(
         self,
-        imsize: Tuple[int, int, int],
-        patch_size: Optional[Tuple[int, int, int]] = None,
+        imsize: tuple[int, int, int],
+        patch_size: Optional[tuple[int, int, int]] = None,
         reduce_mean: bool = True,
         check_compute_fn: bool = False,
     ) -> None:
@@ -34,8 +34,8 @@ class SurfaceDice(EpochMetric):
         self,
         spacings_mm: torch.Tensor,
         tolerance_mm: float,
-        imsize: Tuple[int, int, int],
-        patch_size: Optional[Tuple[int, int, int]] = None,
+        imsize: tuple[int, int, int],
+        patch_size: Optional[tuple[int, int, int]] = None,
         reduce_mean: bool = True,
         prog_bar: bool = True,
         check_compute_fn: bool = False,

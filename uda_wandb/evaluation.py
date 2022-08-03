@@ -16,6 +16,7 @@ from uda import HParams, reshape_to_volume
 from uda.models import VAEConfig, VAE, UNetConfig, UNet
 from uda.datasets import CC359
 import ignite.distributed as idist
+from .download import download_dataset
 
 vendors = ["GE_15", "GE_3", "SIEMENS_15", "SIEMENS_3", "PHILIPS_15", "PHILIPS_3"]
 
@@ -38,7 +39,7 @@ def evaluate_vae(run_id: str, project: str, team: str = "iserh", table_plot: boo
         model = VAE.from_pretrained(tmpdir / "best_model.pt", vae_config)
         model.eval().to(idist.device())
 
-    dataset.prepare_data()
+    download_dataset(CC359)
     dataset.setup()
     data_loader = dataset.val_dataloader(hparams.val_batch_size)
 
@@ -133,7 +134,7 @@ def evaluate_unet(run_id: str, project: str, team: str = "iserh", table_plot: bo
         model = UNet.from_pretrained(tmpdir / "best_model.pt", unet_config)
         model.eval().to(idist.device())
 
-    dataset.prepare_data()
+    download_dataset(CC359)
     dataset.setup()
     data_loader = dataset.val_dataloader(hparams.val_batch_size)
 
@@ -226,12 +227,11 @@ def cross_evaluate_unet(run_id: str, project: str, team: str = "iserh", table_pl
         model = UNet.from_pretrained(tmpdir / "best_model.pt", unet_config)
         model.eval().to(idist.device())
 
-    dataset.prepare_data()  # downloads the dataset
-
     for vendor in vendors:
         print(f"\nEVALUATING VENDOR - {vendor} -\n")
         dataset.config.vendor = vendor
 
+        download_dataset(CC359)
         dataset.setup()
         data_loader = dataset.val_dataloader(hparams.val_batch_size)
 

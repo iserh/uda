@@ -1,4 +1,5 @@
-from typing import Any, Callable, Tuple, Union
+from collections.abc import Callable
+from typing import Any, Union
 
 import numpy as np
 import torch
@@ -7,7 +8,7 @@ from patchify import unpatchify
 
 
 def reshape_to_volume(
-    data: Union[np.ndarray, torch.Tensor], imsize: Tuple[int, int, int], patch_size: Tuple[int, int, int]
+    data: Union[np.ndarray, torch.Tensor], imsize: tuple[int, int, int], patch_size: tuple[int, int, int]
 ) -> Union[np.ndarray, torch.Tensor]:
     # check if torch.Tensor (patchify uses numpy backend)
     if isinstance(data, torch.Tensor):
@@ -33,7 +34,7 @@ def reshape_to_volume(
 
 
 def pipe(*transforms: Callable) -> Callable:
-    def output_transform(output: Tuple[torch.Tensor, torch.Tensor]) -> Any:
+    def output_transform(output: tuple[torch.Tensor, torch.Tensor]) -> Any:
         for transform in transforms:
             output = transform(output)
 
@@ -42,22 +43,22 @@ def pipe(*transforms: Callable) -> Callable:
     return output_transform
 
 
-def binary_one_hot_output_transform(output: Tuple[torch.Tensor, torch.Tensor]) -> Tuple[torch.Tensor, torch.Tensor]:
+def binary_one_hot_output_transform(output: tuple[torch.Tensor, torch.Tensor]) -> tuple[torch.Tensor, torch.Tensor]:
     y_pred, y = output
     y_pred = y_pred.sigmoid().round().long()
     y_pred = to_onehot(y_pred, 2)
     return y_pred, y.long()
 
 
-def to_cpu_output_transform(output: Tuple[torch.Tensor, ...]) -> Tuple[torch.Tensor, ...]:
+def to_cpu_output_transform(output: tuple[torch.Tensor, ...]) -> tuple[torch.Tensor, ...]:
     return [tensor.cpu() for tensor in output]
 
 
-def sigmoid_round_output_transform(output: Tuple[torch.Tensor, torch.Tensor]) -> Tuple[torch.Tensor, torch.Tensor]:
+def sigmoid_round_output_transform(output: tuple[torch.Tensor, torch.Tensor]) -> tuple[torch.Tensor, torch.Tensor]:
     y_pred, y_true = output
     return y_pred.sigmoid().round().long(), y_true
 
 
-def flatten_output_transform(output: Tuple[torch.Tensor, torch.Tensor], dim: int = 0) -> None:
+def flatten_output_transform(output: tuple[torch.Tensor, torch.Tensor], dim: int = 0) -> None:
     y_pred, y_true = output
     return y_pred.sigmoid().round().long().flatten(dim), y_true.flatten(dim)
