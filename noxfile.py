@@ -38,7 +38,7 @@ def lint(session: Session) -> None:
 def format(session: Session) -> None:
     args = session.posargs or locations
 
-    # session.install("black", "isort", "docformatter", "reindent", "tomlkit", "toml-sort")
+    # session.install("black", "isort", "docformatter", "reindent", "toml-sort")
 
     session.run("isort", "--atomic", *args)
     session.run(

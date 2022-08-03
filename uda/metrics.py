@@ -4,13 +4,9 @@ import numpy as np
 import torch
 from ignite.metrics import EpochMetric
 from surface_distance import compute_surface_dice_at_tolerance, compute_surface_distances
+from tqdm import tqdm
 
-from .utils import flatten_output_transform, is_notebook, reshape_to_volume
-
-if is_notebook():
-    from tqdm.notebook import tqdm
-else:
-    from tqdm import tqdm
+from .utils import flatten_output_transform, reshape_to_volume
 
 
 class DiceScore(EpochMetric):

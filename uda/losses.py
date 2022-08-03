@@ -26,8 +26,8 @@ class VAELoss(nn.Module):
         self.rec_loss_fn = _LossCriterion[rec_loss].value(**rec_loss_kwargs)
         self.return_sum = return_sum
 
-    def forward(self, out: Tuple[torch.Tensor, ...], x_true: torch.Tensor) -> torch.Tensor:
-        x_rec, mean, v_log = out
+    def forward(self, output: Tuple[torch.Tensor, ...], x_true: torch.Tensor) -> torch.Tensor:
+        x_rec, mean, v_log = output
 
         rec_l = self.rec_loss_fn(x_rec, x_true)
         kl_l = kl_loss(mean, v_log)
@@ -138,7 +138,7 @@ class Optimizer(str, Enum):
     Adam = _Optimizer.Adam.name
 
 
-def loss_fn(criterion_name: str) -> Type[nn.Module]:
+def get_criterion(criterion_name: str) -> Type[nn.Module]:
     return _LossCriterion[criterion_name].value
 
 

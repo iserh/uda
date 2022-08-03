@@ -1,97 +1,70 @@
+#!/usr/bin/env python
 from pathlib import Path
-from typing import List, Optional
 
-import torch
+import ignite.distributed as idist
 import wandb
 from ignite.contrib.handlers.tqdm_logger import ProgressBar
 from ignite.contrib.handlers.wandb_logger import WandBLogger
-from ignite.engine import Engine, Events, create_supervised_evaluator, create_supervised_trainer
-from ignite.handlers import EarlyStopping, ModelCheckpoint
-from ignite.metrics import ConfusionMatrix, DiceCoefficient, Loss
-from ignite.utils import setup_logger
-from torch.utils.data import DataLoader
+from ignite.engine import Events
 
-from uda import HParams, UNet, UNetConfig
-from uda.datasets import CC359, CC359Config
-from uda.losses import loss_fn, optimizer_cls
-from uda.utils import binary_one_hot_output_transform
+from uda import HParams, get_criterion, optimizer_cls
+from uda.datasets import CC359
+from uda.models import UNet, UNetConfig
+from uda.trainer import SegTrainer, segmentation_standard_metrics
 
 
-def run(config_dir: Path, data_dir: Path, project: str, tags: List[str] = [], group: Optional[str] = None) -> None:
-    # load configuration files
-    dataset_config: CC359Config = CC359Config.from_file(config_dir / "cc359.yaml")
-    unet_config: UNetConfig = UNetConfig.from_file(config_dir / "unet.yaml")
-    hparams: HParams = HParams.from_file(config_dir / "hparams.yaml")
+def run(dataset: CC359, hparams: HParams, model_config: UNetConfig) -> None:
+    dataset.prepare_data()
+    dataset.setup()
 
-    run = wandb.init(
-        project=project,
-        tags=tags,
-        group=group,
-        config={
-            "hparams": hparams.__dict__,
-            "dataset": dataset_config.__dict__,
-            "model": unet_config.__dict__,
-        },
+    model = UNet(model_config).to(idist.device())
+    optim = optimizer_cls(hparams.optimizer)(model.parameters(), lr=hparams.learning_rate)
+    loss_fn = get_criterion(hparams.criterion)(**hparams.loss_kwargs)
+
+    trainer = SegTrainer(
+        model=model,
+        optim=optim,
+        train_loader=dataset.train_dataloader(hparams.val_batch_size),
+        val_loader=dataset.val_dataloader(hparams.val_batch_size),
+        loss_fn=loss_fn,
+        patience=hparams.early_stopping_patience,
+        metrics=segmentation_standard_metrics(loss_fn),
     )
 
-    run.save(str(config_dir / "*"), base_path=str(config_dir.parent), policy="now")
-    run.save(str(Path(__file__)), policy="now")
+    ProgressBar().attach(trainer)
+    ProgressBar().attach(trainer.val_evaluator)
 
-    cc359 = run.use_artifact("iserh/UDA-Datasets/CC359-Skull-stripping:latest")
-    data_dir = cc359.download(root=data_dir)
+    trainer.run(dataset.train_dataloader(hparams.train_batch_size), max_epochs=hparams.epochs)
 
-    train_dataset = CC359(data_dir, dataset_config, train=True)
-    val_dataset = CC359(data_dir, dataset_config, train=False)
 
-    train_loader = DataLoader(train_dataset, batch_size=hparams.train_batch_size, shuffle=True)
-    val_loader = DataLoader(val_dataset, batch_size=hparams.val_batch_size, shuffle=False)
+def run_with_wandb(dataset: CC359, hparams: HParams, model_config: UNetConfig) -> None:
+    dataset.prepare_data()
+    dataset.setup()
 
-    # -------------------- model, loss, metrics --------------------
+    model = UNet(model_config).to(idist.device())
+    optim = optimizer_cls(hparams.optimizer)(model.parameters(), lr=hparams.learning_rate)
+    loss_fn = get_criterion(hparams.criterion)(**hparams.loss_kwargs)
 
-    model = UNet(unet_config)
-
+    # log model size
     n_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
-    run.summary.update({"n_parameters": n_params})
+    wandb.summary.update({"n_parameters": n_params})
 
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    print(f"Using device: {device}")
+    trainer = SegTrainer(
+        model=model,
+        optim=optim,
+        train_loader=dataset.train_dataloader(hparams.val_batch_size),
+        val_loader=dataset.val_dataloader(hparams.val_batch_size),
+        loss_fn=loss_fn,
+        patience=hparams.early_stopping_patience,
+        metrics=segmentation_standard_metrics(loss_fn),
+        cache_dir=wandb.run.dir,
+    )
 
-    model.to(device)  # Move model before creating optimizer
-    optimizer = optimizer_cls(hparams.optimizer)(model.parameters(), lr=hparams.learning_rate)
-    criterion = loss_fn(hparams.criterion)(**hparams.loss_kwargs)
+    ProgressBar().attach(trainer)
+    ProgressBar().attach(trainer.val_evaluator)
 
-    # metrics
-    cm = ConfusionMatrix(num_classes=2, output_transform=binary_one_hot_output_transform)
-    metrics = {"dice": DiceCoefficient(cm, ignore_index=0), "loss": Loss(criterion)}
-
-    # -------------------- trainer & evaluators --------------------
-
-    trainer = create_supervised_trainer(model, optimizer, criterion, device=device)
-    trainer.logger = setup_logger("Trainer")
-
-    train_evaluator = create_supervised_evaluator(model, metrics=metrics, device=device)
-    train_evaluator.logger = setup_logger("Train Evaluator")
-
-    validation_evaluator = create_supervised_evaluator(model, metrics=metrics, device=device)
-    validation_evaluator.logger = setup_logger("Val Evaluator")
-
-    # evaluation callback
-    @trainer.on(Events.EPOCH_COMPLETED)
-    def compute_metrics(engine: Engine) -> None:
-        if train_dataset.fold is not None:
-            train_evaluator.run(train_loader)
-        validation_evaluator.run(val_loader)
-
-    # -------------------- Handlers --------------------
-    # -----------------------------------------------------
-
-    # ---------- tqdm ----------
-    pbar = ProgressBar()
-    pbar.attach(trainer)
-
-    # -------------------- WandB --------------------
-
-    wandb_logger = WandBLogger(id=run.id)
+    # wandb logger
+    wandb_logger = WandBLogger(id=wandb.run.id)
     wandb_logger.attach_output_handler(
         trainer,
         event_name=Events.ITERATION_COMPLETED,
@@ -99,86 +72,63 @@ def run(config_dir: Path, data_dir: Path, project: str, tags: List[str] = [], gr
         output_transform=lambda loss: {"batchloss": loss},
     )
 
-    for tag, evaluator, metr in [("training", train_evaluator, metrics), ("validation", validation_evaluator, metrics)]:
+    for tag, evaluator in [("training", trainer.train_evaluator), ("validation", trainer.val_evaluator)]:
         wandb_logger.attach_output_handler(
             evaluator,
             event_name=Events.EPOCH_COMPLETED,
             tag=tag,
-            metric_names=list(metr.keys()),
+            metric_names=list(trainer.metrics.keys()),
             global_step_transform=lambda *_: trainer.state.iteration,
         )
 
-    # -------------------- model checkpoint --------------------
-
-    # score function used for model checkpoint
-    def score_function(engine: Engine) -> None:
-        if len(engine.state.metrics["dice"]) == 1:
-            return engine.state.metrics["dice"].item()
-        else:
-            return 0
-
-    model_checkpoint = ModelCheckpoint(
-        wandb_logger.run.dir,
-        n_saved=1,
-        score_function=score_function,
-        filename_pattern="best_model.pt",
-    )
-
-    validation_evaluator.add_event_handler(Events.COMPLETED, model_checkpoint, {"model": model})
-
-    # -------------------- early stopping --------------------
-
-    if hparams.early_stopping:
-        early_stopping = EarlyStopping(
-            patience=hparams.early_stopping_patience,
-            score_function=score_function,
-            trainer=trainer,
-        )
-
-        evaluator.add_event_handler(Events.COMPLETED, early_stopping)
-
-    # -------------------- training --------------------
-
-    # kick everything off
-    trainer.run(train_loader, max_epochs=hparams.epochs)
+    trainer.run(dataset.train_dataloader(hparams.train_batch_size), max_epochs=hparams.epochs)
 
     wandb_logger.close()
 
-    return run.id
-
 
 if __name__ == "__main__":
-    import shutil
-    from argparse import ArgumentParser
     from tempfile import TemporaryDirectory
+    from commons import get_args
+    from uda_wandb import delete_model_binaries, evaluate_unet, cross_evaluate_unet
 
-    parser = ArgumentParser()
-    parser.add_argument("-t", "--tags", nargs="+", default=[])
-    args = parser.parse_args()
+    args = get_args()
 
-    # directories
-    data_dir = Path("/tmp/data/CC359")
-    config_dir = Path("config")
-    project = "UDA-CC359"
+    # load configuration
+    hparams = HParams.from_file(args.config / "hparams.yaml")
+    model_config = UNetConfig.from_file(args.config / "unet.yaml")
+    dataset = CC359.from_preconfigured(args.config / "cc359.yaml", root=args.data)
 
-    with TemporaryDirectory() as tmpdir:
-        tmpdir = Path(tmpdir)
-        (tmpdir / "config").mkdir()
+    if args.wandb:
+        r = wandb.init(
+            project=args.project,
+            tags=args.tags,
+            group=args.group,
+            config={
+                "hparams": hparams.__dict__,
+                "dataset": dataset.config.__dict__,
+                "model": model_config.__dict__,
+            },
+        )
 
-        shutil.copy(config_dir / "cc359.yaml", tmpdir / "config")
-        shutil.copy(config_dir / "hparams.yaml", tmpdir / "config")
-        shutil.copy(config_dir / "unet.yaml", tmpdir / "config")
+        # we have to copy the config files to a tmp dir, because the original files might change during wandb syncing
+        with TemporaryDirectory() as tmpdir:
+            cfg_dir = Path(tmpdir) / "config"
+            cfg_dir.mkdir(parents=True)
 
-        run_id = run(tmpdir / "config", data_dir, project=project, tags=args.tags, group="U-Net")
+            hparams.save(cfg_dir / "hparams.yaml")
+            model_config.save(cfg_dir / "unet.yaml")
+            dataset.config.save(cfg_dir / "cc359.yaml")
 
-    from evaluate_run import evaluate_run
+            wandb.save(str(Path(__file__)), policy="now")
+            wandb.save(str(cfg_dir / "*"), base_path=str(cfg_dir.parent), policy="now")
 
-    evaluate_run(run_id, project=project, save_predictions=True)
+            run_with_wandb(dataset, hparams, model_config)
 
-    from cross_evaluate_run import cross_evaluate_run
-
-    cross_evaluate_run(run_id, project=project, save_predictions=True)
-
-    # from delete_model_binaries import delete_model_binaries
-
-    # delete_model_binaries(run_id, project=project)
+        if args.evaluate:
+            evaluate_unet(r.id, args.project, table_plot=True)
+        if args.cross_eval:
+            cross_evaluate_unet(r.id, args.project, table_plot=True)
+        if not args.store:
+            delete_model_binaries(r.id, args.project)
+    else:
+        run(dataset, hparams, model_config)

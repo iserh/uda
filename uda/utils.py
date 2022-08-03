@@ -6,28 +6,6 @@ from ignite.utils import to_onehot
 from patchify import unpatchify
 
 
-def is_notebook() -> bool:
-    try:
-        import os
-
-        from IPython import get_ipython
-
-        if "IPKernelApp" not in get_ipython().config:  # pragma: no cover
-            raise ImportError("console")
-        if "VSCODE_PID" in os.environ:  # pragma: no cover
-            raise ImportError("vscode")
-    except Exception:
-        return False
-    else:  # pragma: no cover
-        return True
-
-
-if is_notebook():
-    from tqdm.notebook import tqdm  # noqa: F401
-else:
-    from tqdm import tqdm  # noqa: F401
-
-
 def reshape_to_volume(
     data: Union[np.ndarray, torch.Tensor], imsize: Tuple[int, int, int], patch_size: Tuple[int, int, int]
 ) -> Union[np.ndarray, torch.Tensor]:
@@ -71,21 +49,11 @@ def binary_one_hot_output_transform(output: Tuple[torch.Tensor, torch.Tensor]) -
     return y_pred, y.long()
 
 
-def to_cpu(output: Tuple[torch.Tensor, ...]) -> Tuple[torch.Tensor, ...]:
+def to_cpu_output_transform(output: Tuple[torch.Tensor, ...]) -> Tuple[torch.Tensor, ...]:
     return [tensor.cpu() for tensor in output]
 
 
-def pred_from_vae_output(output: Tuple[Tuple[torch.Tensor, ...], torch.Tensor]) -> Tuple[torch.Tensor, torch.Tensor]:
-    vae_output, x_true = output
-    return vae_output[0], x_true
-
-
-def distr_from_vae_output(output: Tuple[torch.Tensor, torch.Tensor]) -> Tuple[torch.Tensor, torch.Tensor]:
-    vae_output, _ = output
-    return vae_output[1:]
-
-
-def sigmoid_round(output: Tuple[torch.Tensor, torch.Tensor]) -> Tuple[torch.Tensor, torch.Tensor]:
+def sigmoid_round_output_transform(output: Tuple[torch.Tensor, torch.Tensor]) -> Tuple[torch.Tensor, torch.Tensor]:
     y_pred, y_true = output
     return y_pred.sigmoid().round().long(), y_true
 
