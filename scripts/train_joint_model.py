@@ -51,10 +51,14 @@ def run(dataset: CC359, teacher: nn.Module, vae: nn.Module, hparams: HParams, mo
 def run_with_wandb(dataset: CC359, hparams: HParams, model_config: UNetConfig) -> None:
     teacher_data = TeacherData(teacher, dataset)
     teacher_data.setup(hparams.val_batch_size)
+
     train_loader = teacher_data.train_dataloader(hparams.val_batch_size)
+    val_loader = teacher_data.val_dataloader(hparams.val_batch_size)  # pseudo labels
+    true_val_loader = dataset.val_dataloader(hparams.val_batch_size)  # real labels
 
     model = UNet(model_config).to(idist.device())
     model.load_state_dict(teacher.state_dict())  # copy weights
+
     optim = optimizer_cls(hparams.optimizer)(model.parameters(), lr=hparams.learning_rate)
     schedule = LinearLR(optim, 0.01, 1.0, len(train_loader))
     loss_fn = get_criterion(hparams.criterion)(**hparams.loss_kwargs)
@@ -71,8 +75,8 @@ def run_with_wandb(dataset: CC359, hparams: HParams, model_config: UNetConfig) -
         loss_fn=loss_fn,
         lambd=hparams.vae_lamdb,
         train_loader=train_loader,
-        val_loader=teacher_data.val_dataloader(hparams.val_batch_size),
-        test_loader=teacher_data.dataset.val_dataloader(hparams.val_batch_size),
+        val_loader=val_loader,  # pseudo labels
+        true_val_loader=true_val_loader,  # real labels
         patience=hparams.early_stopping_patience,
         metrics=joint_standard_metrics(loss_fn),
     )
@@ -80,7 +84,7 @@ def run_with_wandb(dataset: CC359, hparams: HParams, model_config: UNetConfig) -
     ProgressBar(desc="Train", persist=True).attach(trainer)
     ProgressBar(desc="Train(Eval)", persist=True).attach(trainer.train_evaluator)
     ProgressBar(desc="Val", persist=True).attach(trainer.val_evaluator)
-    ProgressBar(desc="Test", persist=True).attach(trainer.test_evaluator)
+    ProgressBar(desc="Val(True)", persist=True).attach(trainer.true_val_evaluator)
 
     # wandb logger
     wandb_logger = WandBLogger(id=wandb.run.id)
@@ -94,21 +98,20 @@ def run_with_wandb(dataset: CC359, hparams: HParams, model_config: UNetConfig) -
     trainer.add_event_handler(
         event_name=Events.EPOCH_COMPLETED,
         handler=segmentation_table_plot,
-        evaluator=trainer.val_evaluator,
-        data=dataset.val_split.tensors[0],
+        evaluator=trainer.true_val_evaluator,
         imsize=dataset.imsize,
         patch_size=dataset.patch_size,
     )
     # table evaluation functions needs predictions from validation set
     eos = EpochOutputStore(
-        output_transform=pipe(lambda o: (o[2], o[1]), sigmoid_round_output_transform, to_cpu_output_transform)
+        output_transform=pipe(lambda o: o[:3], sigmoid_round_output_transform, to_cpu_output_transform)
     )
     eos.attach(trainer.val_evaluator, "output")
 
     for tag, evaluator in [
         ("training", trainer.train_evaluator),
         ("validation", trainer.val_evaluator),
-        ("test", trainer.test_evaluator),
+        ("true_validation", trainer.true_val_evaluator),
     ]:
         wandb_logger.attach_output_handler(
             evaluator,
@@ -151,6 +154,8 @@ if __name__ == "__main__":
                 "hparams": hparams.__dict__,
                 "dataset": dataset.config.__dict__,
                 "model": model_config.__dict__,
+                "teacher": teacher.config.__dict__,
+                "vae": vae.config.__dict__,
             },
         )
 

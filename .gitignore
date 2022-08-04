@@ -12,6 +12,7 @@ config
 # files
 .coverage
 poetry.lock
+todo.md
 
 # extensions
 **/*.code-workspace

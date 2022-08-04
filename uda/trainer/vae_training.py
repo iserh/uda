@@ -1,21 +1,27 @@
+from abc import ABC, abstractmethod
 from collections.abc import Callable
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 import ignite.distributed as idist
 import torch
 import torch.nn as nn
-from ignite.engine import Engine
+from ignite.engine import Engine, Events
+from ignite.handlers import EarlyStopping, ModelCheckpoint
 from ignite.metrics import ConfusionMatrix, DiceCoefficient, Loss, Metric
-from ignite.utils import convert_tensor
+from ignite.utils import convert_tensor, setup_logger
 from torch.utils.data import DataLoader
 
 from uda.losses import kl_loss
-from uda.trainer.base import BaseEvaluator, BaseTrainer, dice_score_fn
+from uda.trainer.base import BaseEvaluator, dice_score_fn
 from uda.utils import binary_one_hot_output_transform, pipe
 
 
 class VaeEvaluator(BaseEvaluator):
+    def __init__(self, model: nn.Module):
+        super(VaeEvaluator, self).__init__()
+        self.model = model
+
     @torch.no_grad()
     def step(self, batch: tuple[torch.Tensor, ...]) -> tuple[torch.Tensor, ...]:
         self.model.eval()
@@ -24,10 +30,10 @@ class VaeEvaluator(BaseEvaluator):
             x = convert_tensor(batch[0], idist.device())
             x_rec, mean, v_log = self.model(x)
 
-        return x, x_rec, mean, v_log
+        return x_rec, x, mean, v_log
 
 
-class VaeTrainer(BaseTrainer):
+class VaeTrainer(BaseEvaluator):
     def __init__(
         self,
         model: nn.Module,
@@ -40,19 +46,43 @@ class VaeTrainer(BaseTrainer):
         score_function: Optional[Callable[[Engine], float]] = dice_score_fn,
         cache_dir: Path = Path("/tmp/model-cache"),
     ):
-        super(VaeTrainer, self).__init__(
-            model=model,
-            optim=optim,
-            loss_fn=loss_fn,
-            train_loader=None,
-            val_loader=val_loader,
-            patience=patience,
-            metrics=metrics,
-            score_function=score_function,
-            cache_dir=cache_dir,
-            Evaluator=VaeEvaluator,
-        )
+        super(VaeTrainer, self).__init__()
+        self.model = model
+        self.optim = optim
+        self.loss_fn = loss_fn
         self.beta = beta
+
+        # Evaluation on validation data
+        if val_loader is not None:
+            self.val_evaluator = VaeEvaluator(model)
+            self.add_event_handler(Events.EPOCH_COMPLETED, lambda: self.val_evaluator.run(val_loader))
+
+        # metrics
+        self.metrics = metrics if metrics != {} else None
+        if metrics is not None:
+            for name, metric in self.metrics.items():
+                if val_loader is not None:
+                    metric.attach(self.val_evaluator, name)
+
+        # checkpointing
+        if metrics is not None and score_function is not None and val_loader is not None:
+            model_checkpoint = ModelCheckpoint(
+                cache_dir,
+                n_saved=1,
+                score_function=score_function,
+                filename_pattern="best_model.pt",
+                require_empty=False,
+            )
+            self.val_evaluator.add_event_handler(Events.COMPLETED, model_checkpoint, {"model": model})
+
+        # early stopping
+        if patience is not None and score_function is not None and val_loader is not None:
+            self.stopper = EarlyStopping(
+                patience=patience,
+                score_function=score_function,
+                trainer=self,
+            )
+            self.val_evaluator.add_event_handler(Events.COMPLETED, self.stopper)
 
     def step(self, batch: tuple[torch.Tensor, ...]) -> tuple[torch.Tensor, torch.Tensor]:
         self.optim.zero_grad()
@@ -73,12 +103,12 @@ class VaeTrainer(BaseTrainer):
 
 def vae_standard_metrics(loss_fn: nn.Module) -> dict[str, Metric]:
     return {
-        "rec_loss": Loss(loss_fn, output_transform=lambda o: (o[1], o[0])),
+        "rec_loss": Loss(loss_fn, output_transform=lambda o: o[:2]),
         "kl_loss": Loss(kl_loss, output_transform=lambda o: o[2:]),
         "dice": DiceCoefficient(
             ConfusionMatrix(
                 num_classes=2,
-                output_transform=pipe(lambda o: (o[1], o[0]), binary_one_hot_output_transform),
+                output_transform=pipe(lambda o: o[:2], binary_one_hot_output_transform),
             ),
             ignore_index=0,
         ),

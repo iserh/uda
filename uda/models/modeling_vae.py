@@ -120,7 +120,7 @@ class VAE(nn.ModuleDict):
 
     @classmethod
     def from_pretrained(cls, path: Union[Path, str]) -> "VAE":
-        model_dict = torch.load(path)
+        model_dict = torch.load(path / "best_model.pt")
         model = cls(model_dict["config"])
         model.load_state_dict(model_dict["state_dict"])
 

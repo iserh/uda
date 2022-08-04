@@ -1,26 +1,29 @@
+from abc import ABC, abstractmethod
 from collections.abc import Callable
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 import ignite.distributed as idist
 import torch
 import torch.nn as nn
 from ignite.engine import Engine, Events
+from ignite.handlers import EarlyStopping, ModelCheckpoint
 from ignite.metrics import ConfusionMatrix, DiceCoefficient, Loss, Metric
-from ignite.utils import convert_tensor
+from ignite.utils import convert_tensor, setup_logger
 from torch.utils.data import DataLoader
 
-from uda.trainer.base import BaseEvaluator, BaseTrainer, dice_score_fn
+from uda.trainer.base import BaseEvaluator, dice_score_fn
 from uda.utils import binary_one_hot_output_transform, pipe
 
 
 class JointEvaluator(BaseEvaluator):
     def __init__(self, model: nn.Module, vae: nn.Module):
-        super().__init__(model)
+        super(JointEvaluator, self).__init__()
+        self.model = model
         self.vae = vae.to(idist.device())
 
     @torch.no_grad()
-    def step(self, batch: tuple[torch.Tensor, ...]) -> torch.Tensor:
+    def step(self, batch: tuple[torch.Tensor, ...]) -> tuple[torch.Tensor, ...]:
         self.model.eval()
         self.vae.eval()
 
@@ -29,10 +32,10 @@ class JointEvaluator(BaseEvaluator):
         y_pred = self.model(x)
         y_rec, _, _ = self.vae(x)
 
-        return x, y_true, y_pred, y_rec
+        return y_pred, y_true, x, y_rec
 
 
-class JointTrainer(BaseTrainer):
+class JointTrainer(BaseEvaluator):
     def __init__(
         self,
         model: nn.Module,
@@ -43,39 +46,67 @@ class JointTrainer(BaseTrainer):
         lambd: float = 1.0,
         train_loader: Optional[DataLoader] = None,
         val_loader: Optional[DataLoader] = None,
-        test_loader: Optional[DataLoader] = None,
+        true_val_loader: Optional[DataLoader] = None,
         patience: Optional[int] = None,
         metrics: Optional[dict[str, Metric]] = None,
         score_function: Optional[Callable[[Engine], float]] = dice_score_fn,
         cache_dir: Path = Path("/tmp/model-cache"),
     ):
-        super(JointTrainer, self).__init__(
-            model=model,
-            optim=optim,
-            loss_fn=loss_fn,
-            train_loader=train_loader,
-            val_loader=val_loader,
-            patience=patience,
-            metrics=metrics,
-            score_function=score_function,
-            cache_dir=cache_dir,
-            Evaluator=JointEvaluator,
-            evaluator_args=[vae],
-        )
-        self.schedule = schedule
+        super(JointTrainer, self).__init__()
+        self.model = model
         self.vae = vae.to(idist.device())
+        self.optim = optim
+        self.schedule = schedule
+        self.loss_fn = loss_fn
         self.lambd = lambd
 
-        # Evaluation on validation data
-        if test_loader is not None:
-            self.test_evaluator = JointEvaluator(model, vae)
-            self.add_event_handler(Events.EPOCH_COMPLETED, lambda: self.test_evaluator.run(test_loader))
-            # metrics
-            if self.metrics is not None:
-                for name, metric in self.metrics.items():
-                    metric.attach(self.test_evaluator, name)
+        # Evaluation on train data
+        if train_loader is not None:
+            self.train_evaluator = JointEvaluator(model)
+            self.add_event_handler(Events.EPOCH_COMPLETED, lambda: self.train_evaluator.run(train_loader))
 
-    def step(self, batch: tuple[torch.Tensor, ...]) -> torch.Tensor:
+        # Evaluation on validation data
+        if val_loader is not None:
+            self.val_evaluator = JointEvaluator(model)
+            self.add_event_handler(Events.EPOCH_COMPLETED, lambda: self.val_evaluator.run(val_loader))
+
+        # Evaluation on validation data
+        if true_val_loader is not None:
+            self.true_val_evaluator = JointEvaluator(model)
+            self.add_event_handler(Events.EPOCH_COMPLETED, lambda: self.true_val_evaluator.run(true_val_loader))
+
+        # metrics
+        self.metrics = metrics if metrics != {} else None
+        if metrics is not None:
+            for name, metric in self.metrics.items():
+                if train_loader is not None:
+                    metric.attach(self.train_evaluator, name)
+                if val_loader is not None:
+                    metric.attach(self.val_evaluator, name)
+                if true_val_loader is not None:
+                    metric.attach(self.true_val_evaluator, name)
+
+        # checkpointing
+        if metrics is not None and score_function is not None and true_val_loader is not None:
+            model_checkpoint = ModelCheckpoint(
+                cache_dir,
+                n_saved=1,
+                score_function=score_function,
+                filename_pattern="best_model.pt",
+                require_empty=False,
+            )
+            self.true_val_evaluator.add_event_handler(Events.COMPLETED, model_checkpoint, {"model": model})
+
+        # early stopping
+        if patience is not None and score_function is not None and true_val_loader is not None:
+            self.stopper = EarlyStopping(
+                patience=patience,
+                score_function=score_function,
+                trainer=self,
+            )
+            self.true_val_evaluator.add_event_handler(Events.COMPLETED, self.stopper)
+
+    def step(self, batch: tuple[torch.Tensor, ...]) -> tuple[torch.Tensor, torch.Tensor]:
         self.optim.zero_grad()
         self.model.train()
         self.vae.eval()
@@ -99,12 +130,12 @@ class JointTrainer(BaseTrainer):
 
 def joint_standard_metrics(loss_fn: nn.Module) -> dict[str, Metric]:
     return {
-        "pseudo_loss": Loss(loss_fn, output_transform=lambda o: (o[2], o[1])),
-        "rec_loss": Loss(loss_fn, output_transform=lambda o: (o[2], o[3])),
+        "pseudo_loss": Loss(loss_fn, output_transform=lambda o: o[:2]),
+        "rec_loss": Loss(loss_fn, output_transform=lambda o: (o[0], o[3])),
         "dice": DiceCoefficient(
             ConfusionMatrix(
                 num_classes=2,
-                output_transform=pipe(lambda o: (o[2], o[1]), binary_one_hot_output_transform),
+                output_transform=pipe(lambda o: o[:2], binary_one_hot_output_transform),
             ),
             ignore_index=0,
         ),

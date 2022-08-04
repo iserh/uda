@@ -406,11 +406,11 @@ def segmentation_table_plot(
     table_size: int = 5,
 ):
     print("Creating Segmentation prediction table")
-    preds, targets = [*zip(*evaluator.state.output)]
+    preds, targets, data = [*zip(*evaluator.state.output)]
 
     preds = torch.cat(preds).numpy()
     targets = torch.cat(targets).numpy()
-    data = data.numpy()
+    data = torch.cat(data).numpy()
 
     preds = reshape_to_volume(preds, imsize, patch_size)
     targets = reshape_to_volume(targets, imsize, patch_size)

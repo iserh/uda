@@ -1,32 +1,38 @@
+from abc import ABC, abstractmethod
 from collections.abc import Callable
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 import ignite.distributed as idist
 import torch
 import torch.nn as nn
-from ignite.engine import Engine
+from ignite.engine import Engine, Events
+from ignite.handlers import EarlyStopping, ModelCheckpoint
 from ignite.metrics import ConfusionMatrix, DiceCoefficient, Loss, Metric
-from ignite.utils import convert_tensor
+from ignite.utils import convert_tensor, setup_logger
 from torch.utils.data import DataLoader
 
-from uda.trainer.base import BaseEvaluator, BaseTrainer, dice_score_fn
+from uda.trainer.base import BaseEvaluator, dice_score_fn
 from uda.utils import binary_one_hot_output_transform, pipe
 
 
 class SegEvaluator(BaseEvaluator):
+    def __init__(self, model: nn.Module):
+        super(SegEvaluator, self).__init__()
+        self.model = model
+
     @torch.no_grad()
-    def step(self, batch: tuple[torch.Tensor, ...]) -> torch.Tensor:
+    def step(self, batch: tuple[torch.Tensor, ...]) -> tuple[torch.Tensor, ...]:
         self.model.eval()
 
         x = convert_tensor(batch[0], idist.device())
         y_true = convert_tensor(batch[1], idist.device())
         y_pred = self.model(x)
 
-        return x, y_true, y_pred
+        return y_pred, y_true, x
 
 
-class SegTrainer(BaseTrainer):
+class SegTrainer(BaseEvaluator):
     def __init__(
         self,
         model: nn.Module,
@@ -39,18 +45,49 @@ class SegTrainer(BaseTrainer):
         score_function: Optional[Callable[[Engine], float]] = dice_score_fn,
         cache_dir: Path = Path("/tmp/model-cache"),
     ):
-        super(SegTrainer, self).__init__(
-            model=model,
-            optim=optim,
-            loss_fn=loss_fn,
-            train_loader=train_loader,
-            val_loader=val_loader,
-            patience=patience,
-            metrics=metrics,
-            score_function=score_function,
-            cache_dir=cache_dir,
-            Evaluator=SegEvaluator,
-        )
+        super(SegTrainer, self).__init__()
+        self.model = model
+        self.optim = optim
+        self.loss_fn = loss_fn
+
+        # Evaluation on train data
+        if train_loader is not None:
+            self.train_evaluator = SegEvaluator(model)
+            self.add_event_handler(Events.EPOCH_COMPLETED, lambda: self.train_evaluator.run(train_loader))
+
+        # Evaluation on validation data
+        if val_loader is not None:
+            self.val_evaluator = SegEvaluator(model)
+            self.add_event_handler(Events.EPOCH_COMPLETED, lambda: self.val_evaluator.run(val_loader))
+
+        # metrics
+        self.metrics = metrics if metrics != {} else None
+        if metrics is not None:
+            for name, metric in self.metrics.items():
+                if train_loader is not None:
+                    metric.attach(self.train_evaluator, name)
+                if val_loader is not None:
+                    metric.attach(self.val_evaluator, name)
+
+        # checkpointing
+        if metrics is not None and score_function is not None and val_loader is not None:
+            model_checkpoint = ModelCheckpoint(
+                cache_dir,
+                n_saved=1,
+                score_function=score_function,
+                filename_pattern="best_model.pt",
+                require_empty=False,
+            )
+            self.val_evaluator.add_event_handler(Events.COMPLETED, model_checkpoint, {"model": model})
+
+        # early stopping
+        if patience is not None and score_function is not None and val_loader is not None:
+            self.stopper = EarlyStopping(
+                patience=patience,
+                score_function=score_function,
+                trainer=self,
+            )
+            self.val_evaluator.add_event_handler(Events.COMPLETED, self.stopper)
 
     def step(self, batch: tuple[torch.Tensor, ...]) -> torch.Tensor:
         self.optim.zero_grad()
@@ -69,11 +106,11 @@ class SegTrainer(BaseTrainer):
 
 def segmentation_standard_metrics(loss_fn: nn.Module) -> dict[str, Metric]:
     return {
-        "loss": Loss(loss_fn, output_transform=lambda o: (o[2], o[1])),
+        "loss": Loss(loss_fn, output_transform=lambda o: o[:2]),
         "dice": DiceCoefficient(
             ConfusionMatrix(
                 num_classes=2,
-                output_transform=pipe(lambda o: (o[2], o[1]), binary_one_hot_output_transform),
+                output_transform=pipe(lambda o: o[:2], binary_one_hot_output_transform),
             ),
             ignore_index=0,
         ),

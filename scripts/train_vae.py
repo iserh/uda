@@ -91,7 +91,7 @@ def run_with_wandb(dataset: CC359, hparams: HParams, model_config: VAEConfig):
     )
     # table evaluation functions needs predictions from validation set
     eos = EpochOutputStore(
-        output_transform=pipe(lambda o: (o[1], o[0]), sigmoid_round_output_transform, to_cpu_output_transform)
+        output_transform=pipe(lambda o: o[:2], sigmoid_round_output_transform, to_cpu_output_transform)
     )
     eos.attach(trainer.val_evaluator, "output")
 

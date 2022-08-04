@@ -44,10 +44,13 @@ def pipe(*transforms: Callable) -> Callable:
 
 
 def binary_one_hot_output_transform(output: tuple[torch.Tensor, torch.Tensor]) -> tuple[torch.Tensor, torch.Tensor]:
-    y_pred, y = output
-    y_pred = y_pred.sigmoid().round().long()
-    y_pred = to_onehot(y_pred, 2)
-    return y_pred, y.long()
+    y_pred, y_true = output[:2]
+    rest = output[2:] if len(output) > 2 else []
+
+    y_pred = y_pred.sigmoid().round()
+    y_pred = to_onehot(y_pred.long(), 2)
+
+    return y_pred, y_true.long(), *rest
 
 
 def to_cpu_output_transform(output: tuple[torch.Tensor, ...]) -> tuple[torch.Tensor, ...]:
@@ -55,10 +58,9 @@ def to_cpu_output_transform(output: tuple[torch.Tensor, ...]) -> tuple[torch.Ten
 
 
 def sigmoid_round_output_transform(output: tuple[torch.Tensor, torch.Tensor]) -> tuple[torch.Tensor, torch.Tensor]:
-    y_pred, y_true = output
-    return y_pred.sigmoid().round().long(), y_true
+    y_pred = output[0]
+    return y_pred.sigmoid().round(), output[1:]
 
 
 def flatten_output_transform(output: tuple[torch.Tensor, torch.Tensor], dim: int = 0) -> None:
-    y_pred, y_true = output
-    return y_pred.sigmoid().round().long().flatten(dim), y_true.flatten(dim)
+    return [o.flatten(dim) for o in output]

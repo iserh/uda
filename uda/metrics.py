@@ -6,7 +6,7 @@ from ignite.metrics import EpochMetric
 from surface_distance import compute_surface_dice_at_tolerance, compute_surface_distances
 from tqdm import tqdm
 
-from .utils import flatten_output_transform, reshape_to_volume
+from .utils import flatten_output_transform, pipe, reshape_to_volume, sigmoid_round_output_transform
 
 
 class DiceScore(EpochMetric):
@@ -17,7 +17,8 @@ class DiceScore(EpochMetric):
         reduce_mean: bool = True,
         check_compute_fn: bool = False,
     ) -> None:
-        super(DiceScore, self).__init__(self.compute_fn, flatten_output_transform, check_compute_fn)
+        output_transform = pipe(sigmoid_round_output_transform, flatten_output_transform)
+        super(DiceScore, self).__init__(self.compute_fn, output_transform, check_compute_fn)
         self.imsize = imsize
         self.patch_size = patch_size
         self.reduce_mean = reduce_mean
@@ -40,7 +41,8 @@ class SurfaceDice(EpochMetric):
         prog_bar: bool = True,
         check_compute_fn: bool = False,
     ) -> None:
-        super(SurfaceDice, self).__init__(self.compute_fn, flatten_output_transform, check_compute_fn)
+        output_transform = pipe(sigmoid_round_output_transform, flatten_output_transform)
+        super(SurfaceDice, self).__init__(self.compute_fn, output_transform, check_compute_fn)
         self.spacings_mm = spacings_mm
         self.tolerance_mm = tolerance_mm
         self.imsize = imsize
