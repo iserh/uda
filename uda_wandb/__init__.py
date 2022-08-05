@@ -2,7 +2,7 @@
 from importlib.metadata import version
 
 from .delete import delete_model_binaries  # noqa: F401
-from .download import download_configuration, download_dataset  # noqa: F401
+from .download import download_config, download_dataset  # noqa: F401
 from .evaluation import (  # noqa: F401
     cross_evaluate_unet,
     evaluate_unet,
@@ -10,6 +10,7 @@ from .evaluation import (  # noqa: F401
     segmentation_table_plot,
     vae_table_plot,
 )
+from .config import RunConfig
 
 try:
     __version__ = version(__name__)

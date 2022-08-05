@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Optional, Union
 
 import ignite.distributed as idist
 import torch
@@ -50,7 +50,7 @@ class JointTrainer(BaseEvaluator):
         patience: Optional[int] = None,
         metrics: Optional[dict[str, Metric]] = None,
         score_function: Optional[Callable[[Engine], float]] = dice_score_fn,
-        cache_dir: Path = Path("/tmp/model-cache"),
+        cache_dir: Union[Path, str] = "/tmp/models",
     ):
         super(JointTrainer, self).__init__()
         self.model = model
@@ -62,17 +62,17 @@ class JointTrainer(BaseEvaluator):
 
         # Evaluation on train data
         if train_loader is not None:
-            self.train_evaluator = JointEvaluator(model)
+            self.train_evaluator = JointEvaluator(model, vae)
             self.add_event_handler(Events.EPOCH_COMPLETED, lambda: self.train_evaluator.run(train_loader))
 
         # Evaluation on validation data
         if val_loader is not None:
-            self.val_evaluator = JointEvaluator(model)
+            self.val_evaluator = JointEvaluator(model, vae)
             self.add_event_handler(Events.EPOCH_COMPLETED, lambda: self.val_evaluator.run(val_loader))
 
         # Evaluation on validation data
         if true_val_loader is not None:
-            self.true_val_evaluator = JointEvaluator(model)
+            self.true_val_evaluator = JointEvaluator(model, vae)
             self.add_event_handler(Events.EPOCH_COMPLETED, lambda: self.true_val_evaluator.run(true_val_loader))
 
         # metrics

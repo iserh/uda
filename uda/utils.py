@@ -59,7 +59,7 @@ def to_cpu_output_transform(output: tuple[torch.Tensor, ...]) -> tuple[torch.Ten
 
 def sigmoid_round_output_transform(output: tuple[torch.Tensor, torch.Tensor]) -> tuple[torch.Tensor, torch.Tensor]:
     y_pred = output[0]
-    return y_pred.sigmoid().round(), output[1:]
+    return y_pred.sigmoid().round(), *output[1:]
 
 
 def flatten_output_transform(output: tuple[torch.Tensor, torch.Tensor], dim: int = 0) -> None:

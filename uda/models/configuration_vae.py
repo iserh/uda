@@ -14,3 +14,4 @@ class VAEConfig(Config):
     latent_dim: int = 1024
     dim: int = 2
     use_pooling: bool = False
+    model_name: str = "VAE"

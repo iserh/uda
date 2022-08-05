@@ -27,7 +27,7 @@ class VaeEvaluator(BaseEvaluator):
         self.model.eval()
 
         with torch.no_grad():
-            x = convert_tensor(batch[0], idist.device())
+            x = convert_tensor(batch[1], idist.device())
             x_rec, mean, v_log = self.model(x)
 
         return x_rec, x, mean, v_log
@@ -44,7 +44,7 @@ class VaeTrainer(BaseEvaluator):
         patience: Optional[int] = None,
         metrics: Optional[dict[str, Metric]] = None,
         score_function: Optional[Callable[[Engine], float]] = dice_score_fn,
-        cache_dir: Path = Path("/tmp/model-cache"),
+        cache_dir: Path = Path("/tmp/models"),
     ):
         super(VaeTrainer, self).__init__()
         self.model = model
@@ -88,7 +88,7 @@ class VaeTrainer(BaseEvaluator):
         self.optim.zero_grad()
         self.model.train()
 
-        x = convert_tensor(batch[0], idist.device())
+        x = convert_tensor(batch[1], idist.device())
         x_rec, mean, v_log = self.model(x)
 
         rec_l = self.loss_fn(x_rec, x)

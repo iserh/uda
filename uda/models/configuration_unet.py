@@ -14,3 +14,4 @@ class UNetConfig(Config):
     dim: int = 2
     concat_hidden: bool = False
     use_pooling: bool = False
+    model_name: str = "UNet"

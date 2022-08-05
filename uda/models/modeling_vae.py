@@ -1,6 +1,6 @@
 """U-Net implementation."""
 from pathlib import Path
-from typing import Union
+from typing import Optional, Union
 
 import numpy as np
 import torch
@@ -110,18 +110,16 @@ class VAE(nn.ModuleDict):
         return x_rec, mean, v_log
 
     def save(self, path: str) -> None:
-        torch.save(
-            {
-                "config": self.config,
-                "state_dict": self.state_dict(),
-            },
-            path,
-        )
+        torch.save(self.state_dict(), path)
 
     @classmethod
-    def from_pretrained(cls, path: Union[Path, str]) -> "VAE":
-        model_dict = torch.load(path / "best_model.pt")
-        model = cls(model_dict["config"])
-        model.load_state_dict(model_dict["state_dict"])
+    def from_pretrained(cls, path: Union[Path, str], config: Optional[Union[Path, str, VAEConfig]] = None) -> "VAE":
+        path = Path(path)
+        if config is None:
+            config = VAEConfig.from_file(path.parent / "model.yaml")
+        elif not isinstance(config, VAEConfig):
+            config = VAEConfig.from_file(config)
 
+        model = cls(config)
+        model.load_state_dict(torch.load(path))
         return model

@@ -43,7 +43,7 @@ class SegTrainer(BaseEvaluator):
         patience: Optional[int] = None,
         metrics: Optional[dict[str, Metric]] = None,
         score_function: Optional[Callable[[Engine], float]] = dice_score_fn,
-        cache_dir: Path = Path("/tmp/model-cache"),
+        cache_dir: Path = Path("/tmp/models"),
     ):
         super(SegTrainer, self).__init__()
         self.model = model
