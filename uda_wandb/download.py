@@ -1,16 +1,16 @@
 #!/usr/bin/env python
 import shutil
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from typing import Union
 
 import torch
 import wandb
+import yaml
 from torch.nn import BatchNorm1d, BatchNorm2d, BatchNorm3d
-from uda_wandb.config import RunConfig
 
 from uda.models import VAE, UNet, UNetConfig, VAEConfig
-from tempfile import TemporaryDirectory
-import yaml
+from uda_wandb.config import RunConfig
 
 
 def _move_all_files(src: Union[Path, str], dest: Union[Path, str]) -> None:
@@ -52,7 +52,9 @@ def download_config(run_cfg: RunConfig, path: Union[Path, str] = "config", old: 
     return path
 
 
-def download_old_config(run_cfg: RunConfig, path: Union[Path, str] = "config", ret_model_type: bool = False) -> Union[tuple[Path, str], Path]:
+def download_old_config(
+    run_cfg: RunConfig, path: Union[Path, str] = "config", ret_model_type: bool = False
+) -> Union[tuple[Path, str], Path]:
     path = Path(path)
     print(f"Downloading OLD config from run {run_cfg.run_id}")
 
@@ -141,6 +143,7 @@ def download_old_model(run_cfg: RunConfig, path: Union[Path, str] = "/tmp/models
 
 if __name__ == "__main__":
     from argparse import ArgumentParser
+
     from uda.datasets import CC359
 
     parser = ArgumentParser()

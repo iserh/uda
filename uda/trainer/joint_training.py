@@ -12,10 +12,10 @@ from ignite.metrics import ConfusionMatrix, DiceCoefficient, Loss, Metric
 from ignite.utils import convert_tensor, setup_logger
 from torch.utils.data import DataLoader
 
+from uda.models import VAE, UNet
+from uda.models.modules import CenterCropNd
 from uda.trainer.base import BaseEvaluator, dice_score_fn
 from uda.utils import binary_one_hot_output_transform, pipe
-from uda.models.modules import CenterCropNd
-from uda.models import UNet, VAE
 
 
 class JointEvaluator(BaseEvaluator):

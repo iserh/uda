@@ -47,13 +47,21 @@ class VAEDecoder(nn.Module):
     """Dencoder part of Variational Autoencoder."""
 
     def __init__(
-        self, dim: int, out_channels: int, output_size: tuple[int, ...], latent_dim: int, blocks: tuple[tuple[int, ...]], track_running_stats: bool = False
+        self,
+        dim: int,
+        out_channels: int,
+        output_size: tuple[int, ...],
+        latent_dim: int,
+        blocks: tuple[tuple[int, ...]],
+        track_running_stats: bool = False,
     ) -> None:
         super(VAEDecoder, self).__init__()
         self.hidden_size = [blocks[0][0]] + [size // (2 ** len(blocks)) for size in output_size]
 
         self.linear = nn.Linear(latent_dim, np.prod(self.hidden_size))
-        self.upsample_blocks = nn.Sequential(*[UpsampleBlock(dim, channels, track_running_stats) for channels in blocks])
+        self.upsample_blocks = nn.Sequential(
+            *[UpsampleBlock(dim, channels, track_running_stats) for channels in blocks]
+        )
         self.out_block = ConvNd(
             dim=dim,
             in_channels=blocks[-1][-1],
@@ -78,10 +86,20 @@ class VAE(nn.Module):
         self.config = config
 
         self.encoder = VAEEncoder(
-            config.dim, config.input_size, config.latent_dim, config.encoder_blocks, config.use_pooling, config.track_running_stats
+            config.dim,
+            config.input_size,
+            config.latent_dim,
+            config.encoder_blocks,
+            config.use_pooling,
+            config.track_running_stats,
         )
         self.decoder = VAEDecoder(
-            config.dim, config.encoder_blocks[0][0], config.input_size, config.latent_dim, config.decoder_blocks, config.track_running_stats
+            config.dim,
+            config.encoder_blocks[0][0],
+            config.input_size,
+            config.latent_dim,
+            config.decoder_blocks,
+            config.track_running_stats,
         )
 
         self.encoder.apply(init_weights)

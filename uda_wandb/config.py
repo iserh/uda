@@ -1,5 +1,6 @@
-from uda import Config
 from dataclasses import dataclass
+
+from uda import Config
 
 
 @dataclass

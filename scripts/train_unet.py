@@ -16,7 +16,8 @@ from uda_wandb.evaluation import segmentation_table_plot
 
 
 def run(dataset: CC359, hparams: HParams, model_config: UNetConfig, use_wandb: bool = True) -> None:
-    if use_wandb: import wandb
+    if use_wandb:
+        import wandb
 
     dataset.setup()
 
@@ -32,7 +33,7 @@ def run(dataset: CC359, hparams: HParams, model_config: UNetConfig, use_wandb: b
         loss_fn=loss_fn,
         patience=hparams.early_stopping_patience,
         metrics=segmentation_standard_metrics(loss_fn),
-        cache_dir=wandb.run.dir if use_wandb else "/tmp/models/student"
+        cache_dir=wandb.run.dir if use_wandb else "/tmp/models/student",
     )
 
     ProgressBar(desc="Train", persist=True).attach(trainer)
@@ -66,7 +67,6 @@ def run(dataset: CC359, hparams: HParams, model_config: UNetConfig, use_wandb: b
         )
         eos.attach(trainer.val_evaluator, "output")
 
-
         for tag, evaluator in [("training", trainer.train_evaluator), ("validation", trainer.val_evaluator)]:
             wandb_logger.attach_output_handler(
                 evaluator,
@@ -81,7 +81,8 @@ def run(dataset: CC359, hparams: HParams, model_config: UNetConfig, use_wandb: b
 
 if __name__ == "__main__":
     from commons import get_args
-    from uda_wandb import cross_evaluate_unet, delete_model_binaries, download_dataset, evaluate_unet, RunConfig
+
+    from uda_wandb import RunConfig, cross_evaluate_unet, delete_model_binaries, download_dataset, evaluate_unet
 
     args = get_args()
 

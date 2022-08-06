@@ -11,13 +11,14 @@ from torch.optim.lr_scheduler import LinearLR
 from uda import HParams, get_criterion, optimizer_cls, pipe, sigmoid_round_output_transform, to_cpu_output_transform
 from uda.datasets import CC359
 from uda.datasets.dataset_teacher import TeacherData
-from uda.models import UNet, UNetConfig, VAE
+from uda.models import VAE, UNet, UNetConfig
 from uda.trainer import JointTrainer, joint_standard_metrics
 from uda_wandb import segmentation_table_plot
 
 
 def run(teacher: UNet, vae: VAE, dataset: CC359, hparams: HParams, use_wandb: bool = False) -> None:
-    if use_wandb: import wandb
+    if use_wandb:
+        import wandb
 
     teacher_data = TeacherData(teacher, dataset)
     teacher_data.setup(hparams.val_batch_size)
@@ -45,7 +46,7 @@ def run(teacher: UNet, vae: VAE, dataset: CC359, hparams: HParams, use_wandb: bo
         true_val_loader=true_val_loader,  # real labels
         patience=hparams.early_stopping_patience,
         metrics=joint_standard_metrics(loss_fn),
-        cache_dir=wandb.run.dir if use_wandb else "/tmp/models/student"
+        cache_dir=wandb.run.dir if use_wandb else "/tmp/models/student",
     )
 
     ProgressBar(desc="Train", persist=True).attach(trainer)
@@ -99,8 +100,9 @@ def run(teacher: UNet, vae: VAE, dataset: CC359, hparams: HParams, use_wandb: bo
 
 if __name__ == "__main__":
     from commons import get_args
+
     from uda.datasets import CC359Config
-    from uda_wandb import cross_evaluate_unet, delete_model_binaries, download_dataset, evaluate_unet, RunConfig
+    from uda_wandb import RunConfig, cross_evaluate_unet, delete_model_binaries, download_dataset, evaluate_unet
 
     args = get_args()
 

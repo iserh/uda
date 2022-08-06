@@ -16,7 +16,8 @@ from uda_wandb import vae_table_plot
 
 
 def run(dataset: CC359, hparams: HParams, model_config: VAEConfig, use_wandb: bool = False):
-    if use_wandb: import wandb
+    if use_wandb:
+        import wandb
 
     dataset.setup()
 
@@ -32,7 +33,7 @@ def run(dataset: CC359, hparams: HParams, model_config: VAEConfig, use_wandb: bo
         beta=hparams.vae_beta,
         patience=hparams.early_stopping_patience,
         metrics=vae_standard_metrics(loss_fn),
-        cache_dir=wandb.run.dir if use_wandb else "/tmp/models/student"
+        cache_dir=wandb.run.dir if use_wandb else "/tmp/models/student",
     )
 
     ProgressBar(desc="Train", persist=True).attach(trainer)
@@ -80,7 +81,8 @@ def run(dataset: CC359, hparams: HParams, model_config: VAEConfig, use_wandb: bo
 
 if __name__ == "__main__":
     from commons import get_args
-    from uda_wandb import delete_model_binaries, download_dataset, evaluate_vae, RunConfig
+
+    from uda_wandb import RunConfig, delete_model_binaries, download_dataset, evaluate_vae
 
     args = get_args()
 

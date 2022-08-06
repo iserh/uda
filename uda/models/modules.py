@@ -35,6 +35,7 @@ class ConvWithNorm(nn.Module):
         x = self.activation(x)
         return x
 
+
 class ConvBlock(nn.Sequential):
     """Convolutional block."""
 
@@ -61,7 +62,9 @@ class ConvBlock(nn.Sequential):
 class UpsampleBlock(nn.Module):
     """Downsampling block."""
 
-    def __init__(self, dim: int, channels: list[int], track_running_stats: bool = False, cut_channels_on_upsample: bool = False) -> None:
+    def __init__(
+        self, dim: int, channels: list[int], track_running_stats: bool = False, cut_channels_on_upsample: bool = False
+    ) -> None:
         """Args:
         `channels` : Number of channels in each convolutional layer.
         `dim` : Dimensionality of the input tensor.
@@ -85,7 +88,9 @@ class UpsampleBlock(nn.Module):
 class DownsampleBlock(nn.Module):
     """Downsampling block."""
 
-    def __init__(self, dim: int, channels: list[int], use_pooling: bool = False, track_running_stats: bool = False) -> None:
+    def __init__(
+        self, dim: int, channels: list[int], use_pooling: bool = False, track_running_stats: bool = False
+    ) -> None:
         """Args:
         `channels` : Number of channels in each convolutional layer.
         `dim` : Dimensionality of the input tensor.
@@ -115,7 +120,7 @@ class CenterCropNd(nn.Module):
         self.shape = shape
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        sizes = reversed(x.shape[-len(self.shape):])
+        sizes = reversed(x.shape[-len(self.shape) :])
         shape = reversed(self.shape)
 
         # center crop image if too large

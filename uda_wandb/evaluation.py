@@ -17,7 +17,7 @@ from uda.trainer import VaeEvaluator
 from uda.utils import reshape_to_volume
 from uda_wandb.config import RunConfig
 
-from .download import download_dataset, download_model, download_config
+from .download import download_config, download_dataset, download_model
 
 vendors = ["GE_15", "GE_3", "SIEMENS_15", "SIEMENS_3", "PHILIPS_15", "PHILIPS_3"]
 
