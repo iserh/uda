@@ -101,16 +101,6 @@ def run(teacher: UNet, vae: VAE, dataset: CC359, hparams: HParams, use_wandb: bo
 if __name__ == "__main__":
     from commons import get_args
 
-    from uda.datasets import CC359Config
-    from uda_wandb import (
-        RunConfig,
-        cross_evaluate_unet,
-        delete_model_binaries,
-        download_dataset,
-        download_model,
-        evaluate_unet,
-    )
-
     args = get_args()
 
     # load configuration
@@ -121,13 +111,25 @@ if __name__ == "__main__":
     if args.wandb:
         import wandb
 
+        from uda.datasets import CC359Config
+        from uda_wandb import (
+            RunConfig,
+            cross_evaluate_unet,
+            delete_model_binaries,
+            download_config,
+            download_dataset,
+            download_model,
+            evaluate_unet,
+        )
+
         vae_run = RunConfig.parse_path(args.vae_path)
         download_model(vae_run, path="/tmp/models/vae")
         vae = VAE.from_pretrained("/tmp/models/vae/best_model.pt")
         teacher_run = RunConfig.parse_path(args.teacher_path)
-        download_model(vae_run, path="/tmp/models/teacher")
+        download_model(teacher_run, path="/tmp/models/teacher")
         teacher = UNet.from_pretrained("/tmp/models/teacher/best_model.pt")
         teacher_ds_cfg = CC359Config.from_file("/tmp/models/teacher/dataset.yaml")
+        download_config(teacher_run, path="config")  # student has to have same config as teacher
 
         with wandb.init(
             project=args.project,

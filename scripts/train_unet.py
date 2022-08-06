@@ -82,8 +82,6 @@ def run(dataset: CC359, hparams: HParams, model_config: UNetConfig, use_wandb: b
 if __name__ == "__main__":
     from commons import get_args
 
-    from uda_wandb import RunConfig, cross_evaluate_unet, delete_model_binaries, download_dataset, evaluate_unet
-
     args = get_args()
 
     # load configuration
@@ -93,6 +91,8 @@ if __name__ == "__main__":
 
     if args.wandb:
         import wandb
+
+        from uda_wandb import RunConfig, cross_evaluate_unet, delete_model_binaries, download_dataset, evaluate_unet
 
         with wandb.init(
             project=args.project,
