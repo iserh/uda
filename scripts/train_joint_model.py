@@ -116,7 +116,6 @@ if __name__ == "__main__":
             RunConfig,
             cross_evaluate_unet,
             delete_model_binaries,
-            download_config,
             download_dataset,
             download_model,
             evaluate_unet,
@@ -129,7 +128,6 @@ if __name__ == "__main__":
         download_model(teacher_run, path="/tmp/models/teacher")
         teacher = UNet.from_pretrained("/tmp/models/teacher/best_model.pt")
         teacher_ds_cfg = CC359Config.from_file("/tmp/models/teacher/dataset.yaml")
-        download_config(teacher_run, path="config")  # student has to have same config as teacher
 
         with wandb.init(
             project=args.project,
