@@ -1,5 +1,6 @@
 """U-Net configuration."""
 from dataclasses import dataclass
+from typing import Optional
 
 from uda.config import Config
 
@@ -15,5 +16,5 @@ class VAEConfig(Config):
     dim: int = 2
     use_pooling: bool = False
     batch_norm: bool = True
-    track_running_stats: bool = False
+    track_running_stats: Optional[bool] = None
     model_name: str = "VAE"
