@@ -15,6 +15,7 @@ class ConvWithNorm(nn.Module):
         kernel_size: Union[int, tuple[int, ...]],
         padding: int = 0,
         stride: int = 1,
+        batch_norm: bool = True,
         track_running_stats: bool = False,
     ) -> None:
         super(ConvWithNorm, self).__init__()
@@ -26,7 +27,9 @@ class ConvWithNorm(nn.Module):
             padding=padding,
             stride=stride,
         )
-        self.norm = BatchNormNd(dim, out_channels, track_running_stats=track_running_stats)
+        self.norm = (
+            BatchNormNd(dim, out_channels, track_running_stats=track_running_stats) if batch_norm else nn.Identity()
+        )
         self.activation = nn.ReLU(inplace=True)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -39,7 +42,9 @@ class ConvWithNorm(nn.Module):
 class ConvBlock(nn.Sequential):
     """Convolutional block."""
 
-    def __init__(self, dim: int, channels: list[int], track_running_stats: bool = False) -> None:
+    def __init__(
+        self, dim: int, channels: list[int], batch_norm: bool = True, track_running_stats: bool = False
+    ) -> None:
         """Args:
         `channels` : Number of channels in each convolutional layer.
         `dim` : Dimensionality of the input tensor.
@@ -52,6 +57,7 @@ class ConvBlock(nn.Sequential):
                     out_channels=out_channels,
                     kernel_size=3,
                     padding=1,
+                    batch_norm=batch_norm,
                     track_running_stats=track_running_stats,
                 )
                 for in_channels, out_channels in zip(channels[:-1], channels[1:])
@@ -63,7 +69,12 @@ class UpsampleBlock(nn.Module):
     """Downsampling block."""
 
     def __init__(
-        self, dim: int, channels: list[int], track_running_stats: bool = False, cut_channels_on_upsample: bool = False
+        self,
+        dim: int,
+        channels: list[int],
+        batch_norm: bool = True,
+        track_running_stats: bool = False,
+        cut_channels_on_upsample: bool = False,
     ) -> None:
         """Args:
         `channels` : Number of channels in each convolutional layer.
@@ -77,7 +88,7 @@ class UpsampleBlock(nn.Module):
             kernel_size=2,
             stride=2,
         )
-        self.conv_block = ConvBlock(dim, channels, track_running_stats)
+        self.conv_block = ConvBlock(dim, channels, batch_norm, track_running_stats)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = self.upsample(x)
@@ -89,7 +100,12 @@ class DownsampleBlock(nn.Module):
     """Downsampling block."""
 
     def __init__(
-        self, dim: int, channels: list[int], use_pooling: bool = False, track_running_stats: bool = False
+        self,
+        dim: int,
+        channels: list[int],
+        use_pooling: bool = False,
+        batch_norm: bool = True,
+        track_running_stats: bool = False,
     ) -> None:
         """Args:
         `channels` : Number of channels in each convolutional layer.
@@ -106,7 +122,7 @@ class DownsampleBlock(nn.Module):
                 kernel_size=2,
                 stride=2,
             )
-        self.conv_block = ConvBlock(dim, channels, track_running_stats)
+        self.conv_block = ConvBlock(dim, channels, batch_norm, track_running_stats)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = self.downsampling(x)

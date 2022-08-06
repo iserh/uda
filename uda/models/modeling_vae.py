@@ -20,14 +20,15 @@ class VAEEncoder(nn.Module):
         latent_dim: int,
         blocks: tuple[tuple[int, ...]],
         use_pooling: bool = False,
+        batch_norm: bool = True,
         track_running_stats: bool = False,
     ) -> None:
         super(VAEEncoder, self).__init__()
         hidden_size = [blocks[-1][-1]] + [size // (2 ** len(blocks[1:])) for size in input_size]
 
-        self.in_block = ConvBlock(dim, blocks[0], track_running_stats)
+        self.in_block = ConvBlock(dim, blocks[0], batch_norm, track_running_stats)
         self.downsample_blocks = nn.Sequential(
-            *[DownsampleBlock(dim, channels, use_pooling, track_running_stats) for channels in blocks[1:]]
+            *[DownsampleBlock(dim, channels, use_pooling, batch_norm, track_running_stats) for channels in blocks[1:]]
         )
         self.mean = nn.Linear(np.prod(hidden_size), latent_dim)
         self.variance_log = nn.Linear(np.prod(hidden_size), latent_dim)
@@ -53,6 +54,7 @@ class VAEDecoder(nn.Module):
         output_size: tuple[int, ...],
         latent_dim: int,
         blocks: tuple[tuple[int, ...]],
+        batch_norm: bool = True,
         track_running_stats: bool = False,
     ) -> None:
         super(VAEDecoder, self).__init__()
@@ -60,7 +62,7 @@ class VAEDecoder(nn.Module):
 
         self.linear = nn.Linear(latent_dim, np.prod(self.hidden_size))
         self.upsample_blocks = nn.Sequential(
-            *[UpsampleBlock(dim, channels, track_running_stats) for channels in blocks]
+            *[UpsampleBlock(dim, channels, batch_norm, track_running_stats) for channels in blocks]
         )
         self.out_block = ConvNd(
             dim=dim,
@@ -91,6 +93,7 @@ class VAE(nn.Module):
             config.latent_dim,
             config.encoder_blocks,
             config.use_pooling,
+            config.batch_norm,
             config.track_running_stats,
         )
         self.decoder = VAEDecoder(
@@ -99,6 +102,7 @@ class VAE(nn.Module):
             config.input_size,
             config.latent_dim,
             config.decoder_blocks,
+            config.batch_norm,
             config.track_running_stats,
         )
 
