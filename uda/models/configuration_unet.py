@@ -15,6 +15,6 @@ class UNetConfig(Config):
     dim: int = 2
     concat_hidden: bool = False
     use_pooling: bool = False
-    batch_norm: bool = True
-    track_running_stats: Optional[bool] = None
+    batch_norm: bool = False
+    track_running_stats: bool = True
     model_name: str = "UNet"

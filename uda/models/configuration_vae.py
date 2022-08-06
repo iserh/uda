@@ -15,6 +15,6 @@ class VAEConfig(Config):
     latent_dim: int = 1024
     dim: int = 2
     use_pooling: bool = False
-    batch_norm: bool = True
-    track_running_stats: Optional[bool] = None
+    batch_norm: bool = False
+    track_running_stats: bool = True
     model_name: str = "VAE"
