@@ -14,6 +14,8 @@ from torch.utils.data import DataLoader
 
 from uda.trainer.base import BaseEvaluator, dice_score_fn
 from uda.utils import binary_one_hot_output_transform, pipe
+from uda.models.modules import CenterCropNd
+from uda.models import UNet, VAE
 
 
 class JointEvaluator(BaseEvaluator):
@@ -21,6 +23,7 @@ class JointEvaluator(BaseEvaluator):
         super(JointEvaluator, self).__init__()
         self.model = model
         self.vae = vae.to(idist.device())
+        self.cropping = CenterCropNd(*vae.config.input_size)
 
     @torch.no_grad()
     def step(self, batch: tuple[torch.Tensor, ...]) -> tuple[torch.Tensor, ...]:
@@ -30,16 +33,17 @@ class JointEvaluator(BaseEvaluator):
         x = convert_tensor(batch[0], idist.device())
         y_true = convert_tensor(batch[1], idist.device())
         y_pred = self.model(x)
-        y_rec, _, _ = self.vae(x)
+        y_pred_cropped = self.cropping(y_pred)
+        y_rec, _, _ = self.vae(y_pred_cropped)
 
-        return y_pred, y_true, x, y_rec
+        return y_pred, y_true, y_pred_cropped, y_rec, x
 
 
 class JointTrainer(BaseEvaluator):
     def __init__(
         self,
-        model: nn.Module,
-        vae: nn.Module,
+        model: UNet,
+        vae: VAE,
         optim: torch.optim.Optimizer,
         schedule: torch.optim.lr_scheduler._LRScheduler,
         loss_fn: nn.Module = nn.BCEWithLogitsLoss,
@@ -55,6 +59,7 @@ class JointTrainer(BaseEvaluator):
         super(JointTrainer, self).__init__()
         self.model = model
         self.vae = vae.to(idist.device())
+        self.cropping = CenterCropNd(*vae.config.input_size)
         self.optim = optim
         self.schedule = schedule
         self.loss_fn = loss_fn
@@ -115,10 +120,11 @@ class JointTrainer(BaseEvaluator):
         y_true = convert_tensor(batch[1], idist.device())
         y_pred = self.model(x)
         with torch.no_grad():
-            y_rec, _, _ = self.vae(x)
+            y_pred_cropped = self.cropping(y_pred)
+            y_rec, _, _ = self.vae(y_pred_cropped)
 
         pseudo_loss = self.loss_fn(y_pred, y_true)
-        rec_loss = self.loss_fn(y_pred, y_rec)
+        rec_loss = self.loss_fn(y_pred_cropped, y_rec)
         loss = pseudo_loss + self.lambd * rec_loss
 
         loss.backward()
@@ -131,7 +137,7 @@ class JointTrainer(BaseEvaluator):
 def joint_standard_metrics(loss_fn: nn.Module) -> dict[str, Metric]:
     return {
         "pseudo_loss": Loss(loss_fn, output_transform=lambda o: o[:2]),
-        "rec_loss": Loss(loss_fn, output_transform=lambda o: (o[0], o[3])),
+        "rec_loss": Loss(loss_fn, output_transform=lambda o: (o[2], o[3])),
         "dice": DiceCoefficient(
             ConfusionMatrix(
                 num_classes=2,

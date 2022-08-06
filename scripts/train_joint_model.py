@@ -76,7 +76,7 @@ def run(teacher: UNet, vae: VAE, dataset: CC359, hparams: HParams, use_wandb: bo
         )
         # table evaluation functions needs predictions from validation set
         eos = EpochOutputStore(
-            output_transform=pipe(lambda o: o[:3], sigmoid_round_output_transform, to_cpu_output_transform)
+            output_transform=pipe(lambda o: (*o[:2], o[4]), sigmoid_round_output_transform, to_cpu_output_transform)
         )
         eos.attach(trainer.true_val_evaluator, "output")
 

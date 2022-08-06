@@ -109,6 +109,28 @@ class DownsampleBlock(nn.Module):
         return x
 
 
+class CenterCropNd(nn.Module):
+    def __init__(self, *shape: int) -> None:
+        super().__init__()
+        self.shape = shape
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        sizes = reversed(x.shape[-len(self.shape):])
+        shape = reversed(self.shape)
+
+        # center crop image if too large
+        for i, (size, target) in enumerate(zip(sizes, shape), start=1):
+            if target > size:
+                raise RuntimeError("shape mismatch: target size must be smaller (or equal) tensor size.")
+            if size > target:
+                start_index = int(np.floor((size - target) / 2))
+                end_index = int(np.ceil((size - target) / 2))
+                indices = torch.arange(start_index, size - end_index)
+                x = torch.index_select(x, -i, indices)
+
+        return x
+
+
 def ConvNd(dim: int, *args, **kwargs) -> Union[nn.Conv1d, nn.Conv2d, nn.Conv3d]:
     assert dim > 0 and dim < 4, "Attribute 'dim' has to be >0 and <4."
     cls = getattr(nn, f"Conv{dim}d")
