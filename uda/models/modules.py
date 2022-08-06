@@ -15,6 +15,7 @@ class ConvWithNorm(nn.ModuleDict):
         kernel_size: Union[int, tuple[int, ...]],
         padding: int = 0,
         stride: int = 1,
+        track_running_stats: bool = False,
     ) -> None:
         super(ConvWithNorm, self).__init__(
             {
@@ -26,7 +27,7 @@ class ConvWithNorm(nn.ModuleDict):
                     padding=padding,
                     stride=stride,
                 ),
-                "Norm": BatchNormNd(dim, out_channels),
+                "Norm": BatchNormNd(dim, out_channels, track_running_stats=track_running_stats),
                 "Activation": nn.ReLU(inplace=True),
             }
         )
@@ -37,11 +38,10 @@ class ConvWithNorm(nn.ModuleDict):
         x = self.Activation(x)
         return x
 
-
 class ConvBlock(nn.Sequential):
     """Convolutional block."""
 
-    def __init__(self, dim: int, channels: list[int]) -> None:
+    def __init__(self, dim: int, channels: list[int], track_running_stats: bool = False) -> None:
         """Args:
         `channels` : Number of channels in each convolutional layer.
         `dim` : Dimensionality of the input tensor.
@@ -54,6 +54,7 @@ class ConvBlock(nn.Sequential):
                     out_channels=out_channels,
                     kernel_size=3,
                     padding=1,
+                    track_running_stats=track_running_stats,
                 )
                 for in_channels, out_channels in zip(channels[:-1], channels[1:])
             ]
@@ -63,7 +64,7 @@ class ConvBlock(nn.Sequential):
 class UpsampleBlock(nn.ModuleDict):
     """Downsampling block."""
 
-    def __init__(self, dim: int, channels: list[int], cut_channels_on_upsample: bool = False) -> None:
+    def __init__(self, dim: int, channels: list[int], track_running_stats: bool = False, cut_channels_on_upsample: bool = False) -> None:
         """Args:
         `channels` : Number of channels in each convolutional layer.
         `dim` : Dimensionality of the input tensor.
@@ -77,7 +78,7 @@ class UpsampleBlock(nn.ModuleDict):
                     kernel_size=2,
                     stride=2,
                 ),
-                "ConvBlock": ConvBlock(dim, channels),
+                "ConvBlock": ConvBlock(dim, channels, track_running_stats),
             }
         )
 
@@ -90,7 +91,7 @@ class UpsampleBlock(nn.ModuleDict):
 class DownsampleBlock(nn.ModuleDict):
     """Downsampling block."""
 
-    def __init__(self, dim: int, channels: list[int], use_pooling: bool = False) -> None:
+    def __init__(self, dim: int, channels: list[int], use_pooling: bool = False, track_running_stats: bool = False) -> None:
         """Args:
         `channels` : Number of channels in each convolutional layer.
         `dim` : Dimensionality of the input tensor.
@@ -109,7 +110,7 @@ class DownsampleBlock(nn.ModuleDict):
         super(DownsampleBlock, self).__init__(
             {
                 "Downsample": downsampling,
-                "ConvBlock": ConvBlock(dim, channels),
+                "ConvBlock": ConvBlock(dim, channels, track_running_stats),
             }
         )
 
@@ -134,7 +135,7 @@ def ConvTransposeNd(dim: int, *args, **kwargs) -> Union[nn.ConvTranspose1d, nn.C
 def BatchNormNd(dim: int, *args, **kwargs) -> Union[nn.BatchNorm1d, nn.BatchNorm2d, nn.BatchNorm3d]:
     assert dim > 0 and dim < 4, "Attribute 'dim' has to be >0 and <4."
     cls = getattr(nn, f"BatchNorm{dim}d")
-    return cls(*args, **kwargs, track_running_stats=False)
+    return cls(*args, **kwargs)
 
 
 def MaxPoolNd(dim: int, *args, **kwargs) -> Union[nn.MaxPool1d, nn.MaxPool2d, nn.MaxPool3d]:

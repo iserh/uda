@@ -20,14 +20,15 @@ class VAEEncoder(nn.ModuleDict):
         latent_dim: int,
         blocks: tuple[tuple[int, ...]],
         use_pooling: bool = False,
+        track_running_stats: bool = False,
     ) -> None:
         hidden_size = [blocks[-1][-1]] + [size // (2 ** len(blocks[1:])) for size in input_size]
 
         super(VAEEncoder, self).__init__(
             {
-                "InBlock": ConvBlock(dim, blocks[0]),
+                "InBlock": ConvBlock(dim, blocks[0], track_running_stats),
                 "DownsampleBlocks": nn.Sequential(
-                    *[DownsampleBlock(dim, channels, use_pooling) for channels in blocks[1:]]
+                    *[DownsampleBlock(dim, channels, use_pooling, track_running_stats) for channels in blocks[1:]]
                 ),
                 "Mean": nn.Linear(np.prod(hidden_size), latent_dim),
                 "VarianceLog": nn.Linear(np.prod(hidden_size), latent_dim),
@@ -49,14 +50,14 @@ class VAEDecoder(nn.ModuleDict):
     """Dencoder part of Variational Autoencoder."""
 
     def __init__(
-        self, dim: int, out_channels: int, output_size: tuple[int, ...], latent_dim: int, blocks: tuple[tuple[int, ...]]
+        self, dim: int, out_channels: int, output_size: tuple[int, ...], latent_dim: int, blocks: tuple[tuple[int, ...]], track_running_stats: bool = False
     ) -> None:
         self.hidden_size = [blocks[0][0]] + [size // (2 ** len(blocks)) for size in output_size]
 
         super(VAEDecoder, self).__init__(
             {
                 "Linear": nn.Linear(latent_dim, np.prod(self.hidden_size)),
-                "UpsampleBlocks": nn.Sequential(*[UpsampleBlock(dim, channels) for channels in blocks]),
+                "UpsampleBlocks": nn.Sequential(*[UpsampleBlock(dim, channels, track_running_stats) for channels in blocks]),
                 "OutBlock": ConvNd(
                     dim=dim,
                     in_channels=blocks[-1][-1],
@@ -82,10 +83,10 @@ class VAE(nn.ModuleDict):
         super(VAE, self).__init__(
             {
                 "Encoder": VAEEncoder(
-                    config.dim, config.input_size, config.latent_dim, config.encoder_blocks, config.use_pooling
+                    config.dim, config.input_size, config.latent_dim, config.encoder_blocks, config.use_pooling, config.track_running_stats
                 ),
                 "Decoder": VAEDecoder(
-                    config.dim, config.encoder_blocks[0][0], config.input_size, config.latent_dim, config.decoder_blocks
+                    config.dim, config.encoder_blocks[0][0], config.input_size, config.latent_dim, config.decoder_blocks, config.track_running_stats
                 ),
             }
         )

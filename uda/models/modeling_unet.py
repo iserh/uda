@@ -12,12 +12,12 @@ from .modules import ConvBlock, ConvNd, DownsampleBlock, UpsampleBlock, init_wei
 class UNetEncoder(nn.ModuleDict):
     """Encoder part of U-Net."""
 
-    def __init__(self, dim: int, blocks: tuple[tuple[int, ...]], use_pooling: bool = False) -> None:
+    def __init__(self, dim: int, blocks: tuple[tuple[int, ...]], use_pooling: bool = False, track_running_stats: bool = False) -> None:
         super(UNetEncoder, self).__init__(
             {
-                "InBlock": ConvBlock(dim, blocks[0]),
+                "InBlock": ConvBlock(dim, blocks[0], track_running_stats),
                 "DownsampleBlocks": nn.ModuleList(
-                    [DownsampleBlock(dim, channels, use_pooling) for channels in blocks[1:]]
+                    [DownsampleBlock(dim, channels, use_pooling, track_running_stats) for channels in blocks[1:]]
                 ),
             }
         )
@@ -37,11 +37,11 @@ class UNetDecoder(nn.ModuleDict):
     """Decoder part of U-Net."""
 
     def __init__(
-        self, dim: int, out_channels: int, blocks: tuple[tuple[int, ...]], concat_hidden: bool = False
+        self, dim: int, out_channels: int, blocks: tuple[tuple[int, ...]], track_running_stats: bool = False, concat_hidden: bool = False
     ) -> None:
         super(UNetDecoder, self).__init__(
             {
-                "UpsampleBlocks": nn.ModuleList([UpsampleBlock(dim, channels, concat_hidden) for channels in blocks]),
+                "UpsampleBlocks": nn.ModuleList([UpsampleBlock(dim, channels, track_running_stats, concat_hidden) for channels in blocks]),
                 "OutBlock": ConvNd(
                     dim=dim,
                     in_channels=blocks[-1][-1],
@@ -72,8 +72,8 @@ class UNet(nn.ModuleDict):
     def __init__(self, config: UNetConfig) -> None:
         super(UNet, self).__init__(
             {
-                "Encoder": UNetEncoder(config.dim, config.encoder_blocks, config.use_pooling),
-                "Decoder": UNetDecoder(config.dim, config.out_channels, config.decoder_blocks, config.concat_hidden),
+                "Encoder": UNetEncoder(config.dim, config.encoder_blocks, config.use_pooling, config.track_running_stats),
+                "Decoder": UNetDecoder(config.dim, config.out_channels, config.decoder_blocks, config.track_running_stats, config.concat_hidden),
             }
         )
         self.config = config
