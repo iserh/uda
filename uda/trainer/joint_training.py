@@ -49,8 +49,8 @@ class JointTrainer(BaseEvaluator):
         loss_fn: nn.Module = nn.BCEWithLogitsLoss,
         lambd: float = 1.0,
         train_loader: Optional[DataLoader] = None,
+        pseudo_val_loader: Optional[DataLoader] = None,
         val_loader: Optional[DataLoader] = None,
-        true_val_loader: Optional[DataLoader] = None,
         patience: Optional[int] = None,
         metrics: Optional[dict[str, Metric]] = None,
         score_function: Optional[Callable[[Engine], float]] = dice_score_fn,
@@ -71,14 +71,14 @@ class JointTrainer(BaseEvaluator):
             self.add_event_handler(Events.EPOCH_COMPLETED, lambda: self.train_evaluator.run(train_loader))
 
         # Evaluation on validation data
+        if pseudo_val_loader is not None:
+            self.pseudo_val_evaluator = JointEvaluator(model, vae)
+            self.add_event_handler(Events.EPOCH_COMPLETED, lambda: self.pseudo_val_evaluator.run(pseudo_val_loader))
+
+        # Evaluation on validation data
         if val_loader is not None:
             self.val_evaluator = JointEvaluator(model, vae)
             self.add_event_handler(Events.EPOCH_COMPLETED, lambda: self.val_evaluator.run(val_loader))
-
-        # Evaluation on validation data
-        if true_val_loader is not None:
-            self.true_val_evaluator = JointEvaluator(model, vae)
-            self.add_event_handler(Events.EPOCH_COMPLETED, lambda: self.true_val_evaluator.run(true_val_loader))
 
         # metrics
         self.metrics = metrics if metrics != {} else None
@@ -86,13 +86,13 @@ class JointTrainer(BaseEvaluator):
             for name, metric in self.metrics.items():
                 if train_loader is not None:
                     metric.attach(self.train_evaluator, name)
+                if pseudo_val_loader is not None:
+                    metric.attach(self.pseudo_val_evaluator, name)
                 if val_loader is not None:
                     metric.attach(self.val_evaluator, name)
-                if true_val_loader is not None:
-                    metric.attach(self.true_val_evaluator, name)
 
         # checkpointing
-        if metrics is not None and score_function is not None and true_val_loader is not None:
+        if metrics is not None and score_function is not None and val_loader is not None:
             model_checkpoint = ModelCheckpoint(
                 cache_dir,
                 n_saved=1,
@@ -100,16 +100,16 @@ class JointTrainer(BaseEvaluator):
                 filename_pattern="best_model.pt",
                 require_empty=False,
             )
-            self.true_val_evaluator.add_event_handler(Events.COMPLETED, model_checkpoint, {"model": model})
+            self.val_evaluator.add_event_handler(Events.COMPLETED, model_checkpoint, {"model": model})
 
         # early stopping
-        if patience is not None and score_function is not None and true_val_loader is not None:
+        if patience is not None and score_function is not None and val_loader is not None:
             self.stopper = EarlyStopping(
                 patience=patience,
                 score_function=score_function,
                 trainer=self,
             )
-            self.true_val_evaluator.add_event_handler(Events.COMPLETED, self.stopper)
+            self.val_evaluator.add_event_handler(Events.COMPLETED, self.stopper)
 
     def step(self, batch: tuple[torch.Tensor, ...]) -> tuple[torch.Tensor, torch.Tensor]:
         self.optim.zero_grad()

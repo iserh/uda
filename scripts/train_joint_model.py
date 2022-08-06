@@ -42,8 +42,8 @@ def run(teacher: UNet, vae: VAE, dataset: CC359, hparams: HParams, use_wandb: bo
         loss_fn=loss_fn,
         lambd=hparams.vae_lambd,
         train_loader=train_loader,
-        val_loader=val_loader,  # pseudo labels
-        true_val_loader=true_val_loader,  # real labels
+        pseudo_val_loader=val_loader,  # pseudo labels
+        val_loader=true_val_loader,  # real labels
         patience=hparams.early_stopping_patience,
         metrics=joint_standard_metrics(loss_fn, hparams.vae_lambd),
         cache_dir=wandb.run.dir if use_wandb else "/tmp/models/student",
@@ -51,8 +51,8 @@ def run(teacher: UNet, vae: VAE, dataset: CC359, hparams: HParams, use_wandb: bo
 
     ProgressBar(desc="Train", persist=True).attach(trainer)
     ProgressBar(desc="Train(Eval)", persist=True).attach(trainer.train_evaluator)
+    ProgressBar(desc="Val(Pseudo)", persist=True).attach(trainer.pseudo_val_evaluator)
     ProgressBar(desc="Val", persist=True).attach(trainer.val_evaluator)
-    ProgressBar(desc="Val(True)", persist=True).attach(trainer.true_val_evaluator)
 
     if use_wandb:
         # log model size
@@ -71,7 +71,7 @@ def run(teacher: UNet, vae: VAE, dataset: CC359, hparams: HParams, use_wandb: bo
         trainer.add_event_handler(
             event_name=Events.EPOCH_COMPLETED,
             handler=segmentation_table_plot,
-            evaluator=trainer.true_val_evaluator,
+            evaluator=trainer.val_evaluator,
             imsize=dataset.imsize,
             patch_size=dataset.patch_size,
         )
@@ -79,12 +79,12 @@ def run(teacher: UNet, vae: VAE, dataset: CC359, hparams: HParams, use_wandb: bo
         eos = EpochOutputStore(
             output_transform=pipe(lambda o: (*o[:2], o[4]), sigmoid_round_output_transform, to_cpu_output_transform)
         )
-        eos.attach(trainer.true_val_evaluator, "output")
+        eos.attach(trainer.val_evaluator, "output")
 
         for tag, evaluator in [
             ("training", trainer.train_evaluator),
+            ("pseudo_validation", trainer.pseudo_val_evaluator),
             ("validation", trainer.val_evaluator),
-            ("true_validation", trainer.true_val_evaluator),
         ]:
             wandb_logger.attach_output_handler(
                 evaluator,

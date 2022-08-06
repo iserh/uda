@@ -104,7 +104,7 @@ class VaeTrainer(BaseEvaluator):
 def vae_standard_metrics(loss_fn: nn.Module, beta: float) -> dict[str, Metric]:
     return {
         "rec_loss": Loss(loss_fn, output_transform=lambda o: o[:2]),
-        "kl_loss": Loss(lambda *args: kl_loss(args) * beta, output_transform=lambda o: o[2:]),
+        "kl_loss": Loss(lambda *args: kl_loss(*args) * beta, output_transform=lambda o: o[2:]),
         "dice": DiceCoefficient(
             ConfusionMatrix(
                 num_classes=2,
