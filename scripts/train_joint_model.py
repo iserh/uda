@@ -102,7 +102,14 @@ if __name__ == "__main__":
     from commons import get_args
 
     from uda.datasets import CC359Config
-    from uda_wandb import RunConfig, cross_evaluate_unet, delete_model_binaries, download_dataset, evaluate_unet
+    from uda_wandb import (
+        RunConfig,
+        cross_evaluate_unet,
+        delete_model_binaries,
+        download_dataset,
+        download_model,
+        evaluate_unet,
+    )
 
     args = get_args()
 
@@ -111,14 +118,16 @@ if __name__ == "__main__":
     model_config = UNetConfig.from_file(args.config / "model.yaml")
     dataset = CC359.from_preconfigured(args.config / "dataset.yaml", root=args.data)
 
-    vae = VAE.from_pretrained(args.vae_path / "best_model.pt")
-    vae_run = RunConfig.from_file(args.vae_path / "run_config.yaml")
-    teacher = UNet.from_pretrained(args.teacher_path / "best_model.pt")
-    teacher_ds_cfg = CC359Config.from_file(args.teacher_path / "dataset.yaml")
-    teacher_run = RunConfig.from_file(args.teacher_path / "run_config.yaml")
-
     if args.wandb:
         import wandb
+
+        vae_run = RunConfig.parse_path(args.vae_path)
+        download_model(vae_run, path="/tmp/models/vae")
+        vae = VAE.from_pretrained("/tmp/models/vae/best_model.pt")
+        teacher_run = RunConfig.parse_path(args.teacher_path)
+        download_model(vae_run, path="/tmp/models/teacher")
+        teacher = UNet.from_pretrained("/tmp/models/teacher/best_model.pt")
+        teacher_ds_cfg = CC359Config.from_file("/tmp/models/teacher/dataset.yaml")
 
         with wandb.init(
             project=args.project,
@@ -154,4 +163,7 @@ if __name__ == "__main__":
         if not args.store:
             delete_model_binaries(run_cfg)
     else:
+        vae = VAE.from_pretrained(Path(args.vae_path) / "best_model.pt")
+        teacher = UNet.from_pretrained(Path(args.teacher_path) / "best_model.pt")
+
         run(teacher, vae, dataset, hparams, use_wandb=False)

@@ -12,3 +12,8 @@ class RunConfig(Config):
     @property
     def run_path(self) -> str:
         return f"{self.team}/{self.project}/{self.run_id}"
+
+    @classmethod
+    def parse_path(cls, run_path: str) -> "RunConfig":
+        components = run_path.split("/")
+        return cls(*reversed(components))

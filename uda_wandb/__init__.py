@@ -3,7 +3,7 @@ from importlib.metadata import version
 
 from .config import RunConfig
 from .delete import delete_model_binaries  # noqa: F401
-from .download import download_config, download_dataset  # noqa: F401
+from .download import download_config, download_dataset, download_model  # noqa: F401
 from .evaluation import (  # noqa: F401
     cross_evaluate_unet,
     evaluate_unet,
