@@ -7,6 +7,7 @@ def get_args() -> Namespace:
     parser.add_argument("--data", type=Path, default="/tmp/data/CC359-Skull-stripping")
     parser.add_argument("--config", type=Path, default="config")
     parser.add_argument("--project", type=str, default="Test")
+    parser.add_argument("--download", action="store_true")
     parser.add_argument("--vae-path", type=str, default="/tmp/models/vae")
     parser.add_argument("--teacher-path", type=str, default="/tmp/models/teacher")
     parser.add_argument("-t", "--tags", type=str, default=[], nargs="+")

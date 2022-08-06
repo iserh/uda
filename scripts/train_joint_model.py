@@ -121,13 +121,20 @@ if __name__ == "__main__":
             evaluate_unet,
         )
 
-        vae_run = RunConfig.parse_path(args.vae_path)
-        download_model(vae_run, path="/tmp/models/vae")
-        vae = VAE.from_pretrained("/tmp/models/vae/best_model.pt")
-        teacher_run = RunConfig.parse_path(args.teacher_path)
-        download_model(teacher_run, path="/tmp/models/teacher")
-        teacher = UNet.from_pretrained("/tmp/models/teacher/best_model.pt")
-        teacher_ds_cfg = CC359Config.from_file("/tmp/models/teacher/dataset.yaml")
+        if args.download:
+            vae_run = RunConfig.parse_path(args.vae_path)
+            teacher_run = RunConfig.parse_path(args.teacher_path)
+            vae_path = download_model(vae_run, path="/tmp/models/vae").parent
+            teacher_path = download_model(teacher_run, path="/tmp/models/teacher").parent
+        else:
+            vae_path = Path(args.vae_path)
+            teacher_path = Path(args.teacher_path)
+            vae_run = RunConfig.from_file(vae_path / "run_config.yaml")
+            teacher_run = RunConfig.from_file(teacher_path / "run_config.yaml")
+
+        vae = VAE.from_pretrained(vae_path / "best_model.pt")
+        teacher = UNet.from_pretrained(teacher_path / "best_model.pt")
+        teacher_ds_cfg = CC359Config.from_file(teacher_path / "dataset.yaml")
 
         with wandb.init(
             project=args.project,
