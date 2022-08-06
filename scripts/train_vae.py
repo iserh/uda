@@ -32,7 +32,7 @@ def run(dataset: CC359, hparams: HParams, model_config: VAEConfig, use_wandb: bo
         loss_fn=loss_fn,
         beta=hparams.vae_beta,
         patience=hparams.early_stopping_patience,
-        metrics=vae_standard_metrics(loss_fn),
+        metrics=vae_standard_metrics(loss_fn, hparams.vae_beta),
         cache_dir=wandb.run.dir if use_wandb else "/tmp/models/student",
     )
 

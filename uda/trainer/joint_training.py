@@ -124,8 +124,8 @@ class JointTrainer(BaseEvaluator):
             y_rec, _, _ = self.vae(y_pred_cropped)
 
         pseudo_loss = self.loss_fn(y_pred, y_true)
-        rec_loss = self.loss_fn(y_pred_cropped, y_rec)
-        loss = pseudo_loss + self.lambd * rec_loss
+        rec_loss = self.loss_fn(y_pred_cropped, y_rec) * self.lambd
+        loss = pseudo_loss + rec_loss
 
         loss.backward()
         self.optim.step()
@@ -134,10 +134,10 @@ class JointTrainer(BaseEvaluator):
         return pseudo_loss, rec_loss
 
 
-def joint_standard_metrics(loss_fn: nn.Module) -> dict[str, Metric]:
+def joint_standard_metrics(loss_fn: nn.Module, lambd: float) -> dict[str, Metric]:
     return {
         "pseudo_loss": Loss(loss_fn, output_transform=lambda o: o[:2]),
-        "rec_loss": Loss(loss_fn, output_transform=lambda o: (o[2], o[3])),
+        "rec_loss": Loss(lambda *args: loss_fn(*args) * lambd, output_transform=lambda o: o[2:4]),
         "dice": DiceCoefficient(
             ConfusionMatrix(
                 num_classes=2,

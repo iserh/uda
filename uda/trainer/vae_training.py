@@ -92,8 +92,8 @@ class VaeTrainer(BaseEvaluator):
         x_rec, mean, v_log = self.model(x)
 
         rec_l = self.loss_fn(x_rec, x)
-        kl_l = kl_loss(mean, v_log)
-        loss = self.beta * kl_l + rec_l
+        kl_l = kl_loss(mean, v_log) * self.beta
+        loss = kl_l + rec_l
 
         loss.backward()
         self.optim.step()
@@ -101,10 +101,10 @@ class VaeTrainer(BaseEvaluator):
         return rec_l, kl_l
 
 
-def vae_standard_metrics(loss_fn: nn.Module) -> dict[str, Metric]:
+def vae_standard_metrics(loss_fn: nn.Module, beta: float) -> dict[str, Metric]:
     return {
         "rec_loss": Loss(loss_fn, output_transform=lambda o: o[:2]),
-        "kl_loss": Loss(kl_loss, output_transform=lambda o: o[2:]),
+        "kl_loss": Loss(lambda *args: kl_loss(args) * beta, output_transform=lambda o: o[2:]),
         "dice": DiceCoefficient(
             ConfusionMatrix(
                 num_classes=2,

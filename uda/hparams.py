@@ -31,4 +31,4 @@ class HParams(Config):
     sf_dice_tolerance: Optional[float] = None
     early_stopping_patience: Optional[int] = None
     vae_beta: Optional[float] = None
-    vae_lamdb: Optional[float] = None
+    vae_lambd: Optional[float] = None

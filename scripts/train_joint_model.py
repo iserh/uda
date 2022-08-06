@@ -40,12 +40,12 @@ def run(teacher: UNet, vae: VAE, dataset: CC359, hparams: HParams, use_wandb: bo
         optim=optim,
         schedule=schedule,
         loss_fn=loss_fn,
-        lambd=hparams.vae_lamdb,
+        lambd=hparams.vae_lambd,
         train_loader=train_loader,
         val_loader=val_loader,  # pseudo labels
         true_val_loader=true_val_loader,  # real labels
         patience=hparams.early_stopping_patience,
-        metrics=joint_standard_metrics(loss_fn),
+        metrics=joint_standard_metrics(loss_fn, hparams.vae_lambd),
         cache_dir=wandb.run.dir if use_wandb else "/tmp/models/student",
     )
 
