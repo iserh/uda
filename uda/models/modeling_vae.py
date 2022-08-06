@@ -10,7 +10,7 @@ from .configuration_vae import VAEConfig
 from .modules import ConvBlock, ConvNd, DownsampleBlock, UpsampleBlock, init_weights
 
 
-class VAEEncoder(nn.ModuleDict):
+class VAEEncoder(nn.Module):
     """Encoder part of Variational Autoencoder."""
 
     def __init__(
@@ -22,82 +22,73 @@ class VAEEncoder(nn.ModuleDict):
         use_pooling: bool = False,
         track_running_stats: bool = False,
     ) -> None:
+        super(VAEEncoder, self).__init__()
         hidden_size = [blocks[-1][-1]] + [size // (2 ** len(blocks[1:])) for size in input_size]
 
-        super(VAEEncoder, self).__init__(
-            {
-                "InBlock": ConvBlock(dim, blocks[0], track_running_stats),
-                "DownsampleBlocks": nn.Sequential(
-                    *[DownsampleBlock(dim, channels, use_pooling, track_running_stats) for channels in blocks[1:]]
-                ),
-                "Mean": nn.Linear(np.prod(hidden_size), latent_dim),
-                "VarianceLog": nn.Linear(np.prod(hidden_size), latent_dim),
-            }
+        self.in_block = ConvBlock(dim, blocks[0], track_running_stats)
+        self.downsample_blocks = nn.Sequential(
+            *[DownsampleBlock(dim, channels, use_pooling, track_running_stats) for channels in blocks[1:]]
         )
+        self.mean = nn.Linear(np.prod(hidden_size), latent_dim)
+        self.variance_log = nn.Linear(np.prod(hidden_size), latent_dim)
 
     def forward(self, x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
-        x = self.InBlock(x)
-        x = self.DownsampleBlocks(x)
+        x = self.in_block(x)
+        x = self.downsample_blocks(x)
         x = x.flatten(1)
 
-        mean = self.Mean(x)
-        variance_log = self.VarianceLog(x)
+        mean = self.mean(x)
+        variance_log = self.variance_log(x)
 
         return mean, variance_log
 
 
-class VAEDecoder(nn.ModuleDict):
+class VAEDecoder(nn.Module):
     """Dencoder part of Variational Autoencoder."""
 
     def __init__(
         self, dim: int, out_channels: int, output_size: tuple[int, ...], latent_dim: int, blocks: tuple[tuple[int, ...]], track_running_stats: bool = False
     ) -> None:
+        super(VAEDecoder, self).__init__()
         self.hidden_size = [blocks[0][0]] + [size // (2 ** len(blocks)) for size in output_size]
 
-        super(VAEDecoder, self).__init__(
-            {
-                "Linear": nn.Linear(latent_dim, np.prod(self.hidden_size)),
-                "UpsampleBlocks": nn.Sequential(*[UpsampleBlock(dim, channels, track_running_stats) for channels in blocks]),
-                "OutBlock": ConvNd(
-                    dim=dim,
-                    in_channels=blocks[-1][-1],
-                    out_channels=out_channels,
-                    kernel_size=3,
-                    padding=1,
-                ),
-            }
+        self.linear = nn.Linear(latent_dim, np.prod(self.hidden_size))
+        self.upsample_blocks = nn.Sequential(*[UpsampleBlock(dim, channels, track_running_stats) for channels in blocks])
+        self.out_block = ConvNd(
+            dim=dim,
+            in_channels=blocks[-1][-1],
+            out_channels=out_channels,
+            kernel_size=3,
+            padding=1,
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        x = self.Linear(x)
+        x = self.linear(x)
         x = x.reshape(-1, *self.hidden_size)
-        x = self.UpsampleBlocks(x)
-        x = self.OutBlock(x)
+        x = self.upsample_blocks(x)
+        x = self.out_block(x)
         return x
 
 
-class VAE(nn.ModuleDict):
+class VAE(nn.Module):
     """Variational Autoencoder."""
 
     def __init__(self, config: VAEConfig) -> None:
-        super(VAE, self).__init__(
-            {
-                "Encoder": VAEEncoder(
-                    config.dim, config.input_size, config.latent_dim, config.encoder_blocks, config.use_pooling, config.track_running_stats
-                ),
-                "Decoder": VAEDecoder(
-                    config.dim, config.encoder_blocks[0][0], config.input_size, config.latent_dim, config.decoder_blocks, config.track_running_stats
-                ),
-            }
-        )
-
+        super(VAE, self).__init__()
         self.config = config
 
-        self.Encoder.apply(init_weights)
-        self.Decoder.apply(init_weights)
+        self.encoder = VAEEncoder(
+            config.dim, config.input_size, config.latent_dim, config.encoder_blocks, config.use_pooling, config.track_running_stats
+        )
+        self.decoder = VAEDecoder(
+            config.dim, config.encoder_blocks[0][0], config.input_size, config.latent_dim, config.decoder_blocks, config.track_running_stats
+        )
+
+        self.encoder.apply(init_weights)
+        self.decoder.apply(init_weights)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        mean, v_log = self.Encoder(x)
+        mean, v_log = self.encoder(x)
 
         if self.training:
             # reparametrization trick
@@ -106,7 +97,7 @@ class VAE(nn.ModuleDict):
         else:
             z = mean
 
-        x_rec = self.Decoder(z)
+        x_rec = self.decoder(z)
 
         return x_rec, mean, v_log
 

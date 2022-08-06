@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 
 
-class ConvWithNorm(nn.ModuleDict):
+class ConvWithNorm(nn.Module):
     """Convolution + BatchNorm + ReLU."""
 
     def __init__(
@@ -17,25 +17,22 @@ class ConvWithNorm(nn.ModuleDict):
         stride: int = 1,
         track_running_stats: bool = False,
     ) -> None:
-        super(ConvWithNorm, self).__init__(
-            {
-                "Conv": ConvNd(
-                    dim=dim,
-                    in_channels=in_channels,
-                    out_channels=out_channels,
-                    kernel_size=kernel_size,
-                    padding=padding,
-                    stride=stride,
-                ),
-                "Norm": BatchNormNd(dim, out_channels, track_running_stats=track_running_stats),
-                "Activation": nn.ReLU(inplace=True),
-            }
+        super(ConvWithNorm, self).__init__()
+        self.conv = ConvNd(
+            dim=dim,
+            in_channels=in_channels,
+            out_channels=out_channels,
+            kernel_size=kernel_size,
+            padding=padding,
+            stride=stride,
         )
+        self.norm = BatchNormNd(dim, out_channels, track_running_stats=track_running_stats)
+        self.activation = nn.ReLU(inplace=True)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        x = self.Conv(x)
-        x = self.Norm(x)
-        x = self.Activation(x)
+        x = self.conv(x)
+        x = self.norm(x)
+        x = self.activation(x)
         return x
 
 class ConvBlock(nn.Sequential):
@@ -61,7 +58,7 @@ class ConvBlock(nn.Sequential):
         )
 
 
-class UpsampleBlock(nn.ModuleDict):
+class UpsampleBlock(nn.Module):
     """Downsampling block."""
 
     def __init__(self, dim: int, channels: list[int], track_running_stats: bool = False, cut_channels_on_upsample: bool = False) -> None:
@@ -69,26 +66,23 @@ class UpsampleBlock(nn.ModuleDict):
         `channels` : Number of channels in each convolutional layer.
         `dim` : Dimensionality of the input tensor.
         """
-        super(UpsampleBlock, self).__init__(
-            {
-                "Upsample": ConvTransposeNd(
-                    dim=dim,
-                    in_channels=channels[0],
-                    out_channels=channels[0] // 2 if cut_channels_on_upsample else channels[0],
-                    kernel_size=2,
-                    stride=2,
-                ),
-                "ConvBlock": ConvBlock(dim, channels, track_running_stats),
-            }
+        super(UpsampleBlock, self).__init__()
+        self.upsample = ConvTransposeNd(
+            dim=dim,
+            in_channels=channels[0],
+            out_channels=channels[0] // 2 if cut_channels_on_upsample else channels[0],
+            kernel_size=2,
+            stride=2,
         )
+        self.conv_block = ConvBlock(dim, channels, track_running_stats)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        x = self.Upsample(x)
-        x = self.ConvBlock(x)
+        x = self.upsample(x)
+        x = self.conv_block(x)
         return x
 
 
-class DownsampleBlock(nn.ModuleDict):
+class DownsampleBlock(nn.Module):
     """Downsampling block."""
 
     def __init__(self, dim: int, channels: list[int], use_pooling: bool = False, track_running_stats: bool = False) -> None:
@@ -96,27 +90,22 @@ class DownsampleBlock(nn.ModuleDict):
         `channels` : Number of channels in each convolutional layer.
         `dim` : Dimensionality of the input tensor.
         """
+        super(DownsampleBlock, self).__init__()
         if use_pooling:
-            downsampling = MaxPoolNd(dim=dim, kernel_size=2, stride=2)
+            self.downsampling = MaxPoolNd(dim=dim, kernel_size=2, stride=2)
         else:
-            downsampling = ConvNd(
+            self.downsampling = ConvNd(
                 dim=dim,
                 in_channels=channels[0],
                 out_channels=channels[0],
                 kernel_size=2,
                 stride=2,
             )
-
-        super(DownsampleBlock, self).__init__(
-            {
-                "Downsample": downsampling,
-                "ConvBlock": ConvBlock(dim, channels, track_running_stats),
-            }
-        )
+        self.conv_block = ConvBlock(dim, channels, track_running_stats)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        x = self.Downsample(x)
-        x = self.ConvBlock(x)
+        x = self.downsampling(x)
+        x = self.conv_block(x)
         return x
 
 

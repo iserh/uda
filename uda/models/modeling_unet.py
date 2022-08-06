@@ -9,81 +9,73 @@ from .configuration_unet import UNetConfig
 from .modules import ConvBlock, ConvNd, DownsampleBlock, UpsampleBlock, init_weights
 
 
-class UNetEncoder(nn.ModuleDict):
+class UNetEncoder(nn.Module):
     """Encoder part of U-Net."""
 
     def __init__(self, dim: int, blocks: tuple[tuple[int, ...]], use_pooling: bool = False, track_running_stats: bool = False) -> None:
-        super(UNetEncoder, self).__init__(
-            {
-                "InBlock": ConvBlock(dim, blocks[0], track_running_stats),
-                "DownsampleBlocks": nn.ModuleList(
-                    [DownsampleBlock(dim, channels, use_pooling, track_running_stats) for channels in blocks[1:]]
-                ),
-            }
+        super(UNetEncoder, self).__init__()
+        self.in_block = ConvBlock(dim, blocks[0], track_running_stats)
+        self.downsample_blocks = nn.ModuleList(
+            [DownsampleBlock(dim, channels, use_pooling, track_running_stats) for channels in blocks[1:]]
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        x = self.InBlock(x)
+        x = self.in_block(x)
 
         hidden_states = []
-        for block in self.DownsampleBlocks:
+        for block in self.downsample_blocks:
             hidden_states.append(x)
             x = block(x)
 
         return x, hidden_states
 
 
-class UNetDecoder(nn.ModuleDict):
+class UNetDecoder(nn.Module):
     """Decoder part of U-Net."""
 
     def __init__(
         self, dim: int, out_channels: int, blocks: tuple[tuple[int, ...]], track_running_stats: bool = False, concat_hidden: bool = False
     ) -> None:
-        super(UNetDecoder, self).__init__(
-            {
-                "UpsampleBlocks": nn.ModuleList([UpsampleBlock(dim, channels, track_running_stats, concat_hidden) for channels in blocks]),
-                "OutBlock": ConvNd(
-                    dim=dim,
-                    in_channels=blocks[-1][-1],
-                    out_channels=out_channels,
-                    kernel_size=3,
-                    padding=1,
-                ),
-            }
+        super(UNetDecoder, self).__init__()
+        self.upsample_blocks = nn.ModuleList([UpsampleBlock(dim, channels, track_running_stats, concat_hidden) for channels in blocks])
+        self.out_block = ConvNd(
+            dim=dim,
+            in_channels=blocks[-1][-1],
+            out_channels=out_channels,
+            kernel_size=3,
+            padding=1,
         )
 
         self.concat_hidden = concat_hidden
 
     def forward(self, x: torch.Tensor, hidden_states: list[torch.Tensor]) -> torch.Tensor:
-        for block, h in zip(self.UpsampleBlocks, reversed(hidden_states)):
+        for block, h in zip(self.upsample_blocks, reversed(hidden_states)):
             if self.concat_hidden:
-                x = block.Upsample(x)
+                x = block.upsample(x)
                 x = torch.cat([x, h], dim=1)
-                x = block.ConvBlock(x)
+                x = block.conv_block(x)
             else:
                 x = block(x) + h
 
-        return self.OutBlock(x)
+        return self.out_block(x)
 
 
-class UNet(nn.ModuleDict):
+class UNet(nn.Module):
     """U-Net segmentation model."""
 
     def __init__(self, config: UNetConfig) -> None:
-        super(UNet, self).__init__(
-            {
-                "Encoder": UNetEncoder(config.dim, config.encoder_blocks, config.use_pooling, config.track_running_stats),
-                "Decoder": UNetDecoder(config.dim, config.out_channels, config.decoder_blocks, config.track_running_stats, config.concat_hidden),
-            }
-        )
+        super(UNet, self).__init__()
         self.config = config
 
-        self.Encoder.apply(init_weights)
-        self.Decoder.apply(init_weights)
+        self.encoder = UNetEncoder(config.dim, config.encoder_blocks, config.use_pooling, config.track_running_stats)
+        self.decoder = UNetDecoder(config.dim, config.out_channels, config.decoder_blocks, config.track_running_stats, config.concat_hidden)
+
+        self.encoder.apply(init_weights)
+        self.decoder.apply(init_weights)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        x, hidden_states = self.Encoder(x)
-        x = self.Decoder(x, hidden_states)
+        x, hidden_states = self.encoder(x)
+        x = self.decoder(x, hidden_states)
         return x
 
     def save(self, path: str) -> None:
