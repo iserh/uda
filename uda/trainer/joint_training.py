@@ -12,8 +12,7 @@ from ignite.metrics import ConfusionMatrix, DiceCoefficient, Loss, Metric
 from ignite.utils import convert_tensor, setup_logger
 from torch.utils.data import DataLoader
 
-from uda.models import VAE, UNet
-from uda.models.modules import CenterCropNd
+from uda.models import VAE, CenterCropNd, UNet, center_crop_nd
 from uda.trainer.base import BaseEvaluator, dice_score_fn
 from uda.utils import binary_one_hot_output_transform, pipe
 
@@ -21,9 +20,9 @@ from uda.utils import binary_one_hot_output_transform, pipe
 class JointEvaluator(BaseEvaluator):
     def __init__(self, model: nn.Module, vae: nn.Module):
         super(JointEvaluator, self).__init__()
-        self.model = model
+        self.model = model.to(idist.device())
         self.vae = vae.to(idist.device())
-        self.cropping = CenterCropNd(*vae.config.input_size)
+        self.vae_cropping = CenterCropNd(*vae.config.input_size)
 
     @torch.no_grad()
     def step(self, batch: tuple[torch.Tensor, ...]) -> tuple[torch.Tensor, ...]:
@@ -33,10 +32,16 @@ class JointEvaluator(BaseEvaluator):
         x = convert_tensor(batch[0], idist.device())
         y_true = convert_tensor(batch[1], idist.device())
         y_pred = self.model(x)
-        y_pred_cropped = self.cropping(y_pred)
-        y_rec, _, _ = self.vae(y_pred_cropped)
 
-        return y_pred, y_true, y_pred_cropped, y_rec, x
+        y_vae = self.vae_cropping(y_pred)
+        y_rec, _, _ = self.vae(y_vae)
+
+        y_true = center_crop_nd(y_true, y_pred.shape[1:])
+        y_vae = center_crop_nd(y_vae, y_rec.shape[1:])
+
+        x = center_crop_nd(x, y_pred.shape[1:])
+
+        return y_pred, y_true, y_vae, y_rec, x
 
 
 class JointTrainer(BaseEvaluator):
@@ -57,9 +62,9 @@ class JointTrainer(BaseEvaluator):
         cache_dir: Union[Path, str] = "/tmp/models",
     ):
         super(JointTrainer, self).__init__()
-        self.model = model
+        self.model = model.to(idist.device())
         self.vae = vae.to(idist.device())
-        self.cropping = CenterCropNd(*vae.config.input_size)
+        self.vae_cropping = CenterCropNd(*vae.config.input_size)
         self.optim = optim
         self.schedule = schedule
         self.loss_fn = loss_fn
@@ -120,11 +125,14 @@ class JointTrainer(BaseEvaluator):
         y_true = convert_tensor(batch[1], idist.device())
         y_pred = self.model(x)
         with torch.no_grad():
-            y_pred_cropped = self.cropping(y_pred)
-            y_rec, _, _ = self.vae(y_pred_cropped)
+            y_vae = self.vae_cropping(y_pred)
+            y_rec, _, _ = self.vae(y_vae)
+
+        y_true = center_crop_nd(y_true, y_pred.shape[1:])
+        y_vae = center_crop_nd(y_vae, y_rec.shape[1:])
 
         pseudo_loss = self.loss_fn(y_pred, y_true)
-        rec_loss = self.loss_fn(y_pred_cropped, y_rec) * self.lambd
+        rec_loss = self.loss_fn(y_vae, y_rec) * self.lambd
         loss = pseudo_loss + rec_loss
 
         loss.backward()

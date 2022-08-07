@@ -20,7 +20,7 @@ class CC359:
 
     artifact_name = "iserh/UDA-Datasets/CC359-Skull-stripping:latest"
 
-    def __init__(self, root: str, config: CC359Config) -> None:
+    def __init__(self, config: CC359Config, root: str = "/tmp/data/CC359-Skull-stripping") -> None:
         """Args:
         `data_path` : Dataset location
         `config` : CC359Config
@@ -37,7 +37,7 @@ class CC359:
     ) -> "CC359":
         if not isinstance(config, CC359Config):
             config = CC359Config.from_file(config)
-        return cls(root, config)
+        return cls(config, root)
 
     def setup(self) -> None:
         images_dir = self.root / "Original" / self.config.vendor

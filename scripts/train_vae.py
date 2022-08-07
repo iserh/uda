@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 from pathlib import Path
 
-import ignite.distributed as idist
 import wandb
 from ignite.contrib.handlers.tqdm_logger import ProgressBar
 from ignite.contrib.handlers.wandb_logger import WandBLogger
@@ -21,7 +20,7 @@ def run(dataset: CC359, hparams: HParams, model_config: VAEConfig, use_wandb: bo
 
     dataset.setup()
 
-    model = VAE(model_config).to(idist.device())
+    model = VAE(model_config)
     optim = optimizer_cls(hparams.optimizer)(model.parameters(), lr=hparams.learning_rate)
     loss_fn = get_criterion(hparams.criterion)(**hparams.loss_kwargs)
 
@@ -67,6 +66,7 @@ def run(dataset: CC359, hparams: HParams, model_config: VAEConfig, use_wandb: bo
             handler=vae_table_plot,
             evaluator=trainer.val_evaluator,
             data=dataset.val_split.tensors[0],
+            dim=model.config.dim,
             imsize=dataset.imsize,
             patch_size=dataset.patch_size,
         )

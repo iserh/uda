@@ -13,6 +13,7 @@ from ignite.utils import convert_tensor, setup_logger
 from torch.utils.data import DataLoader
 
 from uda.losses import kl_loss
+from uda.models import center_crop_nd
 from uda.trainer.base import BaseEvaluator, dice_score_fn
 from uda.utils import binary_one_hot_output_transform, pipe
 
@@ -20,7 +21,7 @@ from uda.utils import binary_one_hot_output_transform, pipe
 class VaeEvaluator(BaseEvaluator):
     def __init__(self, model: nn.Module):
         super(VaeEvaluator, self).__init__()
-        self.model = model
+        self.model = model.to(idist.device())
 
     @torch.no_grad()
     def step(self, batch: tuple[torch.Tensor, ...]) -> tuple[torch.Tensor, ...]:
@@ -29,6 +30,8 @@ class VaeEvaluator(BaseEvaluator):
         with torch.no_grad():
             x = convert_tensor(batch[1], idist.device())
             x_rec, mean, v_log = self.model(x)
+
+        x = center_crop_nd(x, x_rec.shape[1:])
 
         return x_rec, x, mean, v_log
 
@@ -47,7 +50,7 @@ class VaeTrainer(BaseEvaluator):
         cache_dir: Path = Path("/tmp/models"),
     ):
         super(VaeTrainer, self).__init__()
-        self.model = model
+        self.model = model.to(idist.device())
         self.optim = optim
         self.loss_fn = loss_fn
         self.beta = beta
@@ -90,6 +93,8 @@ class VaeTrainer(BaseEvaluator):
 
         x = convert_tensor(batch[1], idist.device())
         x_rec, mean, v_log = self.model(x)
+
+        x = center_crop_nd(x, x_rec.shape[1:])
 
         rec_l = self.loss_fn(x_rec, x)
         kl_l = kl_loss(mean, v_log) * self.beta

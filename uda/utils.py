@@ -1,5 +1,5 @@
 from collections.abc import Callable
-from typing import Any, Union
+from typing import Any, Optional, Union
 
 import numpy as np
 import torch
@@ -8,8 +8,12 @@ from patchify import unpatchify
 
 
 def reshape_to_volume(
-    data: Union[np.ndarray, torch.Tensor], imsize: tuple[int, int, int], patch_size: tuple[int, int, int]
+    data: Union[np.ndarray, torch.Tensor],
+    dim: int,
+    imsize: tuple[int, int, int],
+    patch_size: Optional[tuple[int, int, int]],
 ) -> Union[np.ndarray, torch.Tensor]:
+    imsize = tuple(imsize)
     # check if torch.Tensor (patchify uses numpy backend)
     if isinstance(data, torch.Tensor):
         data = data.numpy()
@@ -19,16 +23,23 @@ def reshape_to_volume(
 
     # unpatchify if data is patchified
     if patch_size is not None:
+        patch_size = tuple(patch_size)
         # compute number of patches for each axis
         n_patches = [axis_size // patch_size for axis_size, patch_size in zip(imsize, patch_size)]
-        batch_size = data.shape[0] // np.prod(n_patches)
+        cropped_patch_size = (
+            patch_size[:-dim] + data.shape[-dim:]
+        )  # if data was cropped due to down/upsampling inaccuracies
+        cropped_imsize = [ps * np for ps, np in zip(cropped_patch_size, n_patches)]
+        batch_size = int(data.shape[0] // (np.prod(n_patches) * np.prod(imsize[:-dim])))
         # subsume batch_size in first patch axis (z-axis)
-        data = data.reshape(batch_size * n_patches[0], *n_patches[1:], *patch_size)
+        data = data.reshape(batch_size * n_patches[0], *n_patches[1:], *cropped_patch_size)
         # unpatchify (subsume batch_size in first image axis)
-        data = unpatchify(data, imsize=(batch_size * imsize[0], *imsize[1:]))
+        data = unpatchify(data, imsize=(batch_size * cropped_imsize[0], *cropped_imsize[1:]))
+    else:
+        cropped_imsize = imsize[:-dim] + data.shape[-dim:]
 
     # extract batch_size in first axis
-    data = data.reshape(-1, *imsize)
+    data = data.reshape(-1, *cropped_imsize)
 
     return torch.from_numpy(data) if output_type_tensor else data
 

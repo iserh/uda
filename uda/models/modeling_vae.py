@@ -1,4 +1,5 @@
 """U-Net implementation."""
+from math import floor
 from pathlib import Path
 from typing import Optional, Union
 
@@ -8,6 +9,19 @@ import torch.nn as nn
 
 from .configuration_vae import VAEConfig
 from .modules import ConvBlock, ConvNd, DownsampleBlock, UpsampleBlock, init_weights
+
+
+def compute_hidden_size(
+    n_blocks: int, input_size: tuple[int, ...], kernel_size: int = 2, padding: int = 0, stride: int = 2
+) -> list[int]:
+    K, P, S = kernel_size, padding, stride
+
+    hidden_sizes = []
+    for size in input_size:
+        W = size
+        hidden_sizes.append([(W := floor((W - K + 2 * P) / S + 1)) for _ in range(n_blocks)][-1])
+
+    return hidden_sizes
 
 
 class VAEEncoder(nn.Module):
@@ -24,7 +38,8 @@ class VAEEncoder(nn.Module):
         track_running_stats: bool = False,
     ) -> None:
         super(VAEEncoder, self).__init__()
-        hidden_size = [blocks[-1][-1]] + [size // (2 ** len(blocks[1:])) for size in input_size]
+        # hidden_size = [ #channels , *img_sizes_after_final_downsampling ]
+        hidden_size = [blocks[-1][-1]] + compute_hidden_size(len(blocks[1:]), input_size)
 
         self.in_block = ConvBlock(dim, blocks[0], batch_norm, track_running_stats)
         self.downsample_blocks = nn.Sequential(
@@ -58,6 +73,7 @@ class VAEDecoder(nn.Module):
         track_running_stats: bool = False,
     ) -> None:
         super(VAEDecoder, self).__init__()
+        # hidden_size = [ #channels , *img_sizes_after_final_upsampling ]
         self.hidden_size = [blocks[0][0]] + [size // (2 ** len(blocks)) for size in output_size]
 
         self.linear = nn.Linear(latent_dim, np.prod(self.hidden_size))

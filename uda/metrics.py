@@ -12,6 +12,7 @@ from .utils import flatten_output_transform, pipe, reshape_to_volume, sigmoid_ro
 class DiceScore(EpochMetric):
     def __init__(
         self,
+        dim: int,
         imsize: tuple[int, int, int],
         patch_size: Optional[tuple[int, int, int]] = None,
         reduce_mean: bool = True,
@@ -19,13 +20,14 @@ class DiceScore(EpochMetric):
     ) -> None:
         output_transform = pipe(sigmoid_round_output_transform, flatten_output_transform)
         super(DiceScore, self).__init__(self.compute_fn, output_transform, check_compute_fn)
+        self.dim = dim
         self.imsize = imsize
         self.patch_size = patch_size
         self.reduce_mean = reduce_mean
 
     def compute_fn(self, y_pred: torch.Tensor, y_true: torch.Tensor) -> torch.Tensor:
-        y_pred = reshape_to_volume(y_pred, self.imsize, self.patch_size)
-        y_true = reshape_to_volume(y_true, self.imsize, self.patch_size)
+        y_pred = reshape_to_volume(y_pred, self.dim, self.imsize, self.patch_size)
+        y_true = reshape_to_volume(y_true, self.dim, self.imsize, self.patch_size)
 
         return dice_score(y_pred, y_true, axis=1 if self.reduce_mean else 0)
 
@@ -35,6 +37,7 @@ class SurfaceDice(EpochMetric):
         self,
         spacings_mm: torch.Tensor,
         tolerance_mm: float,
+        dim: int,
         imsize: tuple[int, int, int],
         patch_size: Optional[tuple[int, int, int]] = None,
         reduce_mean: bool = True,
@@ -45,14 +48,15 @@ class SurfaceDice(EpochMetric):
         super(SurfaceDice, self).__init__(self.compute_fn, output_transform, check_compute_fn)
         self.spacings_mm = spacings_mm
         self.tolerance_mm = tolerance_mm
+        self.dim = dim
         self.imsize = imsize
         self.patch_size = patch_size
         self.reduce_mean = reduce_mean
         self.prog_bar = prog_bar
 
     def compute_fn(self, y_pred: torch.Tensor, y_true: torch.Tensor) -> torch.Tensor:
-        y_pred = reshape_to_volume(y_pred, self.imsize, self.patch_size)
-        y_true = reshape_to_volume(y_true, self.imsize, self.patch_size)
+        y_pred = reshape_to_volume(y_pred, self.dim, self.imsize, self.patch_size)
+        y_true = reshape_to_volume(y_true, self.dim, self.imsize, self.patch_size)
 
         sf_dice_vals = surface_dice(y_pred, y_true, self.spacings_mm, self.tolerance_mm, self.prog_bar)
 

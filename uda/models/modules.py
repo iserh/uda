@@ -1,3 +1,4 @@
+from math import ceil, floor
 from typing import Union
 
 import torch
@@ -136,20 +137,24 @@ class CenterCropNd(nn.Module):
         self.shape = shape
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        sizes = reversed(x.shape[-len(self.shape) :])
-        shape = reversed(self.shape)
+        return center_crop_nd(x, self.shape)
 
-        # center crop image if too large
-        for i, (size, target) in enumerate(zip(sizes, shape), start=1):
-            if target > size:
-                raise RuntimeError("shape mismatch: target size must be smaller (or equal) tensor size.")
-            if size > target:
-                start_index = int(np.floor((size - target) / 2))
-                end_index = int(np.ceil((size - target) / 2))
-                indices = torch.arange(start_index, size - end_index)
-                x = torch.index_select(x, -i, indices)
 
-        return x
+def center_crop_nd(x: torch.Tensor, shape: tuple[int, ...]) -> torch.Tensor:
+    # reverse the shape/sizes because we will iterate from back-2-front
+    sizes = reversed(x.shape[-len(shape) :])
+    shape = reversed(shape)
+
+    for i, (size, target) in enumerate(zip(sizes, shape), start=1):
+        if target > size:
+            raise RuntimeError("shape mismatch: target size must be smaller (or equal) tensor size.")
+        if size > target:
+            start_index = floor((size - target) / 2)
+            end_index = ceil((size - target) / 2)
+            indices = torch.arange(start_index, size - end_index, device=x.device)
+            x = torch.index_select(x, -i, indices)
+
+    return x
 
 
 def ConvNd(dim: int, *args, **kwargs) -> Union[nn.Conv1d, nn.Conv2d, nn.Conv3d]:

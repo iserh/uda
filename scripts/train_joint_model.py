@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 from pathlib import Path
 
-import ignite.distributed as idist
 from ignite.contrib.handlers.tqdm_logger import ProgressBar
 from ignite.contrib.handlers.wandb_logger import WandBLogger
 from ignite.engine import Events
@@ -27,7 +26,7 @@ def run(teacher: UNet, vae: VAE, dataset: CC359, hparams: HParams, use_wandb: bo
     val_loader = teacher_data.val_dataloader(hparams.val_batch_size)  # pseudo labels
     true_val_loader = dataset.val_dataloader(hparams.val_batch_size)  # real labels
 
-    model = UNet(teacher.config).to(idist.device())
+    model = UNet(teacher.config)
     model.load_state_dict(teacher.state_dict())  # copy weights
 
     optim = optimizer_cls(hparams.optimizer)(model.parameters(), lr=hparams.learning_rate)
@@ -72,6 +71,7 @@ def run(teacher: UNet, vae: VAE, dataset: CC359, hparams: HParams, use_wandb: bo
             event_name=Events.EPOCH_COMPLETED,
             handler=segmentation_table_plot,
             evaluator=trainer.val_evaluator,
+            dim=model.config.dim,
             imsize=dataset.imsize,
             patch_size=dataset.patch_size,
         )
