@@ -8,13 +8,15 @@ from uda.config import Config
 class CC359Config(Config):
     """Configuration for Calgary Campinas Dataset.
 
-    `data_path` : Dataset location
-    `vendor` : vendor
-    `fold` : Fold index for cross-validation
-    `rotate` : Rotate the images
-    `flatten` : Flatten 3D volumes to 2D images
-    `patch_size` : Patch dimensions for slicing the images
-    `random_state` : Random state for cross-validation
+    Args:
+        vendor (str): Vendor of the scanner.
+        fold (str, optional): Fold of cv to select. Must be either 0 / 1 / 2. Defaults to None (No splitting).
+        rotate (int, optional): Order of rotation of the images. Defaults to None (no rotation)
+        flatten (bool): Flatten 3d volumes into 2d images. Defaults to False.
+        imsize (tuple[int, int, int]): Size the loaded volumes will get padded/cropped to. Defaults to (192, 256, 256).
+        patch_size (tuple[int, int, int], optional): Size of volume patches. Defaults to None (No patchification).
+        clip_intensities (tuple[int, int], optional): Clip the intensities of the scanner images. Defaults to None (No clipping).
+        random_state (int, optional): Random state for reproducibility (e.g. of kfold splits).
     """
 
     vendor: str

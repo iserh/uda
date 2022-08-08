@@ -18,15 +18,16 @@ from .configuration_cc359 import CC359Config
 
 
 class CC359:
-    """Calgary Campinas data module."""
+    """Calgary Campinas data module.
+
+    Args:
+        config (CC359Config): Configuration for dataset.
+        root (str, optional): Path where dataset is located. Defaults to "/tmp/data/CC359-Skull-stripping".
+    """
 
     artifact_name = "iserh/UDA-Datasets/CC359-Skull-stripping:latest"
 
     def __init__(self, config: CC359Config, root: str = "/tmp/data/CC359-Skull-stripping") -> None:
-        """Args:
-        `data_path` : Dataset location
-        `config` : CC359Config
-        """
         self.root = Path(root)
         self.config = config
         self.imsize = config.imsize
@@ -37,11 +38,21 @@ class CC359:
     def from_preconfigured(
         cls, config: Union[CC359Config, Path, str], root: str = "/tmp/data/CC359-Skull-stripping"
     ) -> "CC359":
+        """Initialize dataset from config.
+
+        Args:
+            config (Union[CC359Config, Path, str]): Either path to config file or config object itself.
+            root (str, optional): Path where dataset is located. Defaults to "/tmp/data/CC359-Skull-stripping".
+
+        Returns:
+            CC359: Configured, but not yet loaded dataset.
+        """
         if not isinstance(config, CC359Config):
             config = CC359Config.from_file(config)
         return cls(config, root)
 
     def setup(self) -> None:
+        """Load data from disk, preprocess and split."""
         images_dir = self.root / "Original" / self.config.vendor
         labels_dir = self.root / "Silver-standard" / self.config.vendor
 
@@ -96,11 +107,15 @@ class CC359:
             ).reshape(n, -1, *self.patch_size)
             targets = torch.from_numpy(targets)
 
-        # split data & targets into train/val
-        kf = KFold(n_splits=3, shuffle=True, random_state=self.random_state)
-        train_indices, val_indices = list(kf.split(files))[self.config.fold]
-        X_train, X_val = data[train_indices], data[val_indices]
-        y_train, y_val = targets[train_indices], targets[val_indices]
+        if self.fold is not None:
+            # split data & targets into train/val
+            kf = KFold(n_splits=3, shuffle=True, random_state=self.random_state)
+            train_indices, val_indices = list(kf.split(files))[self.config.fold]
+            X_train, X_val = data[train_indices], data[val_indices]
+            y_train, y_val = targets[train_indices], targets[val_indices]
+        else:
+            X_train = X_val = data
+            y_train = y_val = targets
 
         # optional flatten & add channel dim
         if self.config.flatten:
