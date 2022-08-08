@@ -1,7 +1,7 @@
 """U-Net implementation."""
 from math import floor
 from pathlib import Path
-from typing import Optional, Union
+from typing import Union
 
 import numpy as np
 import torch
@@ -143,8 +143,9 @@ class VAE(nn.Module):
         torch.save(self.state_dict(), path)
 
     @classmethod
-    def from_pretrained(cls, path: Union[Path, str], config: Optional[Union[Path, str, VAEConfig]] = None) -> "VAE":
+    def from_pretrained(cls, path: str, config: Union[VAEConfig, str, None] = None) -> "VAE":
         path = Path(path)
+
         if config is None:
             config = VAEConfig.from_file(path.parent / "model.yaml")
         elif not isinstance(config, VAEConfig):

@@ -1,6 +1,6 @@
 """U-Net implementation."""
 from pathlib import Path
-from typing import Optional, Union
+from typing import Union
 
 import torch
 import torch.nn as nn
@@ -109,8 +109,9 @@ class UNet(nn.Module):
         torch.save(self.state_dict(), path)
 
     @classmethod
-    def from_pretrained(cls, path: Union[Path, str], config: Optional[Union[Path, str, UNetConfig]] = None) -> "UNet":
+    def from_pretrained(cls, path: str, config: Union[UNetConfig, str, None] = None) -> "UNet":
         path = Path(path)
+
         if config is None:
             config = UNetConfig.from_file(path.parent / "model.yaml")
         elif not isinstance(config, UNetConfig):

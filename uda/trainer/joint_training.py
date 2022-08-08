@@ -1,6 +1,5 @@
 from collections.abc import Callable
-from pathlib import Path
-from typing import Optional, Union
+from typing import Optional
 
 import ignite.distributed as idist
 import torch
@@ -58,7 +57,7 @@ class JointTrainer(BaseEvaluator):
         patience: Optional[int] = None,
         metrics: Optional[dict[str, Metric]] = None,
         score_function: Optional[Callable[[Engine], float]] = dice_score_fn,
-        cache_dir: Union[Path, str] = "/tmp/models",
+        cache_dir: str = "/tmp/models",
     ) -> None:
         super(JointTrainer, self).__init__()
         self.model = model.to(idist.device())

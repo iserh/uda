@@ -21,40 +21,31 @@ class CC359:
     """Calgary Campinas data module.
 
     Args:
-        config (CC359Config): Configuration for dataset.
+        config (Union[CC359Config, str]): Either path to config file or config object itself.
         root (str, optional): Path where dataset is located. Defaults to "/tmp/data/CC359-Skull-stripping".
     """
 
     artifact_name = "iserh/UDA-Datasets/CC359-Skull-stripping:latest"
 
-    def __init__(self, config: CC359Config, root: str = "/tmp/data/CC359-Skull-stripping") -> None:
-        self.root = Path(root)
-        self.config = config
-        self.imsize = config.imsize
-        self.patch_size = config.patch_size
-        self.random_state = config.random_state
-
-    @classmethod
-    def from_preconfigured(
-        cls, config: Union[CC359Config, Path, str], root: str = "/tmp/data/CC359-Skull-stripping"
-    ) -> "CC359":
-        """Initialize dataset from config.
-
-        Args:
-            config (Union[CC359Config, Path, str]): Either path to config file or config object itself.
-            root (str, optional): Path where dataset is located. Defaults to "/tmp/data/CC359-Skull-stripping".
-
-        Returns:
-            CC359: Configured, but not yet loaded dataset.
-        """
+    def __init__(self, config: Union[CC359Config, str], root: str = "/tmp/data/CC359-Skull-stripping") -> None:
         if not isinstance(config, CC359Config):
             config = CC359Config.from_file(config)
-        return cls(config, root)
+
+        self.root = Path(root)
+        self.config = config
+        self.vendor = config.vendor
+        self.fold = config.fold
+        self.rotate = config.rotate
+        self.flatten = config.flatten
+        self.imsize = config.imsize
+        self.patch_size = config.patch_size
+        self.clip_intensities = config.clip_intensities
+        self.random_state = config.random_state
 
     def setup(self) -> None:
         """Load data from disk, preprocess and split."""
-        images_dir = self.root / "Original" / self.config.vendor
-        labels_dir = self.root / "Silver-standard" / self.config.vendor
+        images_dir = self.root / "Original" / self.vendor
+        labels_dir = self.root / "Silver-standard" / self.vendor
 
         # sorted is absolutely crucial here:
         # we cannot expect that files are downloaded in the same order on each system
@@ -71,17 +62,17 @@ class CC359:
             mask = nib_label.get_fdata("unchanged", dtype=np.float32)
 
             # clip & scale the images
-            if self.config.clip_intensities is not None:
-                img = img.clip(min=self.config.clip_intensities[0], max=self.config.clip_intensities[1])
+            if self.clip_intensities is not None:
+                img = img.clip(min=self.clip_intensities[0], max=self.clip_intensities[1])
             img = scaler.fit_transform(img.reshape(-1, 1)).reshape(img.shape)
 
             # from here on -> torch backend
             img = torch.from_numpy(img)
             mask = torch.from_numpy(mask)
 
-            if self.config.rotate is not None:
-                img = torch.rot90(img, k=self.config.rotate, dims=(1, 2))
-                mask = torch.rot90(mask, k=self.config.rotate, dims=(1, 2))
+            if self.rotate is not None:
+                img = torch.rot90(img, k=self.rotate, dims=(1, 2))
+                mask = torch.rot90(mask, k=self.rotate, dims=(1, 2))
 
             img = center_pad_crop(img, self.imsize)
             mask = center_pad_crop(mask, self.imsize)
@@ -110,7 +101,7 @@ class CC359:
         if self.fold is not None:
             # split data & targets into train/val
             kf = KFold(n_splits=3, shuffle=True, random_state=self.random_state)
-            train_indices, val_indices = list(kf.split(files))[self.config.fold]
+            train_indices, val_indices = list(kf.split(files))[self.fold]
             X_train, X_val = data[train_indices], data[val_indices]
             y_train, y_val = targets[train_indices], targets[val_indices]
         else:
@@ -118,7 +109,7 @@ class CC359:
             y_train = y_val = targets
 
         # optional flatten & add channel dim
-        if self.config.flatten:
+        if self.flatten:
             # flatten 3d volumes to 2d images
             X_train = X_train.reshape(-1, *X_train.shape[-2:]).unsqueeze(1)
             X_val = X_val.reshape(-1, *X_val.shape[-2:]).unsqueeze(1)

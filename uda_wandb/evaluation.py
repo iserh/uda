@@ -32,7 +32,7 @@ def evaluate_vae(run_cfg: RunConfig, table_plot: bool = True, table_size: int = 
         with TemporaryDirectory() as tmpdir:
             cfg_dir = download_config(run_cfg, tmpdir)
             hparams: HParams = HParams.from_file(cfg_dir / "hparams.yaml")
-            dataset = CC359.from_preconfigured(cfg_dir / "dataset.yaml")
+            dataset = CC359(cfg_dir / "dataset.yaml")
         with TemporaryDirectory() as tmpdir:
             model_path = download_model(run_cfg, tmpdir)
             model = VAE.from_pretrained(model_path)
@@ -127,7 +127,7 @@ def evaluate_unet(run_cfg: RunConfig, table_plot: bool = True, table_size: int =
         with TemporaryDirectory() as tmpdir:
             cfg_dir = download_config(run_cfg, tmpdir)
             hparams: HParams = HParams.from_file(cfg_dir / "hparams.yaml")
-            dataset = CC359.from_preconfigured(cfg_dir / "dataset.yaml")
+            dataset = CC359(cfg_dir / "dataset.yaml")
         with TemporaryDirectory() as tmpdir:
             model_path = download_model(run_cfg, tmpdir)
             model = UNet.from_pretrained(model_path)
@@ -218,7 +218,7 @@ def cross_evaluate_unet(run_cfg: RunConfig, table_plot: bool = True, table_size:
         with TemporaryDirectory() as tmpdir:
             cfg_dir = download_config(run_cfg, tmpdir)
             hparams: HParams = HParams.from_file(cfg_dir / "hparams.yaml")
-            dataset = CC359.from_preconfigured(cfg_dir / "dataset.yaml")
+            dataset = CC359(cfg_dir / "dataset.yaml")
         with TemporaryDirectory() as tmpdir:
             model_path = download_model(run_cfg, tmpdir)
             model = UNet.from_pretrained(model_path)
@@ -227,11 +227,11 @@ def cross_evaluate_unet(run_cfg: RunConfig, table_plot: bool = True, table_size:
 
         model.eval().to(idist.device())
         for vendor in vendors:
-            dataset.config.vendor = vendor
+            dataset.vendor = vendor
             dataset.setup()
 
             evaluator = SegEvaluator(model)
-            ProgressBar(desc=f"Eval ({dataset.config.vendor})", persist=True).attach(evaluator)
+            ProgressBar(desc=f"Eval ({dataset.vendor})", persist=True).attach(evaluator)
             eos = EpochOutputStore(output_transform=pipe(sigmoid_round_output_transform, to_cpu_output_transform))
             eos.attach(evaluator, "output")
 

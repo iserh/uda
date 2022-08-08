@@ -15,7 +15,8 @@ class CC359Config(Config):
         flatten (bool): Flatten 3d volumes into 2d images. Defaults to False.
         imsize (tuple[int, int, int]): Size the loaded volumes will get padded/cropped to. Defaults to (192, 256, 256).
         patch_size (tuple[int, int, int], optional): Size of volume patches. Defaults to None (No patchification).
-        clip_intensities (tuple[int, int], optional): Clip the intensities of the scanner images. Defaults to None (No clipping).
+        clip_intensities (tuple[int, int], optional): Clip the intensities of the scanner images.
+        Defaults to None (No clipping).
         random_state (int, optional): Random state for reproducibility (e.g. of kfold splits).
     """
 

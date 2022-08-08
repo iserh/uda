@@ -1,5 +1,4 @@
 from collections.abc import Callable
-from pathlib import Path
 from typing import Optional
 
 import ignite.distributed as idist
@@ -46,7 +45,7 @@ class VaeTrainer(BaseEvaluator):
         patience: Optional[int] = None,
         metrics: Optional[dict[str, Metric]] = None,
         score_function: Optional[Callable[[Engine], float]] = dice_score_fn,
-        cache_dir: Path = Path("/tmp/models"),
+        cache_dir: str = "/tmp/models",
     ) -> None:
         super(VaeTrainer, self).__init__()
         self.model = model.to(idist.device())

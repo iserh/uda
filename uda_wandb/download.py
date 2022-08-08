@@ -13,7 +13,7 @@ from uda.models import VAE, UNet, UNetConfig, VAEConfig
 from uda_wandb.config import RunConfig
 
 
-def _move_all_files(src: Union[Path, str], dest: Union[Path, str]) -> None:
+def _move_all_files(src: str, dest: str) -> None:
     dest = Path(dest)
     src = Path(src)
 
@@ -25,7 +25,7 @@ def _move_all_files(src: Union[Path, str], dest: Union[Path, str]) -> None:
         shutil.move(file_path, dest)
 
 
-def download_dataset(dataset: type, path: Union[Path, str] = "/tmp/data/CC359-Skull-stripping") -> Path:
+def download_dataset(dataset: type, path: str = "/tmp/data/CC359-Skull-stripping") -> Path:
     path = Path(path)
 
     api = wandb.Api()
@@ -34,7 +34,7 @@ def download_dataset(dataset: type, path: Union[Path, str] = "/tmp/data/CC359-Sk
     return path
 
 
-def download_config(run_cfg: RunConfig, path: Union[Path, str] = "config", old: bool = False) -> Path:
+def download_config(run_cfg: RunConfig, path: str = "config", old: bool = False) -> Path:
     path = Path(path)
 
     if old:
@@ -53,7 +53,7 @@ def download_config(run_cfg: RunConfig, path: Union[Path, str] = "config", old: 
 
 
 def download_old_config(
-    run_cfg: RunConfig, path: Union[Path, str] = "config", ret_model_type: bool = False
+    run_cfg: RunConfig, path: str = "config", ret_model_type: bool = False
 ) -> Union[tuple[Path, str], Path]:
     path = Path(path)
     print(f"Downloading OLD config from run {run_cfg.run_id}")
@@ -92,7 +92,7 @@ def download_old_config(
     return path, model_type if ret_model_type else path
 
 
-def download_model(run_cfg: RunConfig, path: Union[Path, str] = "/tmp/models/model", old: bool = False) -> Path:
+def download_model(run_cfg: RunConfig, path: str = "/tmp/models/model", old: bool = False) -> Path:
     path = Path(path)
 
     if old:
@@ -106,7 +106,7 @@ def download_model(run_cfg: RunConfig, path: Union[Path, str] = "/tmp/models/mod
     return path / "best_model.pt"
 
 
-def download_old_model(run_cfg: RunConfig, path: Union[Path, str] = "/tmp/models/model") -> Path:
+def download_old_model(run_cfg: RunConfig, path: str = "/tmp/models/model") -> Path:
     path = Path(path)
 
     _, model_type = download_old_config(run_cfg, path, ret_model_type=True)

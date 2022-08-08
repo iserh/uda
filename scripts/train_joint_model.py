@@ -106,7 +106,7 @@ if __name__ == "__main__":
     # load configuration
     hparams = HParams.from_file(args.config / "hparams.yaml")
     model_config = UNetConfig.from_file(args.config / "model.yaml")
-    dataset = CC359.from_preconfigured(args.config / "dataset.yaml", root=args.data)
+    dataset = CC359(args.config / "dataset.yaml", root=args.data)
 
     if args.wandb:
         import wandb
