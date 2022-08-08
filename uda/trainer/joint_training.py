@@ -12,7 +12,7 @@ from ignite.metrics import ConfusionMatrix, DiceCoefficient, Loss, Metric
 from ignite.utils import convert_tensor, setup_logger
 from torch.utils.data import DataLoader
 
-from uda.models import VAE, CenterCropNd, UNet, center_crop_nd
+from uda.models import VAE, CenterPadCrop, UNet, center_pad_crop
 from uda.trainer.base import BaseEvaluator, dice_score_fn
 from uda.utils import binary_one_hot_output_transform, pipe
 
@@ -22,7 +22,7 @@ class JointEvaluator(BaseEvaluator):
         super(JointEvaluator, self).__init__()
         self.model = model.to(idist.device())
         self.vae = vae.to(idist.device())
-        self.vae_cropping = CenterCropNd(*vae.config.input_size)
+        self.vae_cropping = CenterPadCrop(*vae.config.input_size)
 
     @torch.no_grad()
     def step(self, batch: tuple[torch.Tensor, ...]) -> tuple[torch.Tensor, ...]:
@@ -36,10 +36,10 @@ class JointEvaluator(BaseEvaluator):
         y_vae = self.vae_cropping(y_pred)
         y_rec, _, _ = self.vae(y_vae)
 
-        y_true = center_crop_nd(y_true, y_pred.shape[1:])
-        y_vae = center_crop_nd(y_vae, y_rec.shape[1:])
+        y_true = center_pad_crop(y_true, y_pred.shape[1:])
+        y_vae = center_pad_crop(y_vae, y_rec.shape[1:])
 
-        x = center_crop_nd(x, y_pred.shape[1:])
+        x = center_pad_crop(x, y_pred.shape[1:])
 
         return y_pred, y_true, y_vae, y_rec, x
 
@@ -64,7 +64,7 @@ class JointTrainer(BaseEvaluator):
         super(JointTrainer, self).__init__()
         self.model = model.to(idist.device())
         self.vae = vae.to(idist.device())
-        self.vae_cropping = CenterCropNd(*vae.config.input_size)
+        self.vae_cropping = CenterPadCrop(*vae.config.input_size)
         self.optim = optim
         self.schedule = schedule
         self.loss_fn = loss_fn
@@ -128,8 +128,8 @@ class JointTrainer(BaseEvaluator):
             y_vae = self.vae_cropping(y_pred)
             y_rec, _, _ = self.vae(y_vae)
 
-        y_true = center_crop_nd(y_true, y_pred.shape[1:])
-        y_vae = center_crop_nd(y_vae, y_rec.shape[1:])
+        y_true = center_pad_crop(y_true, y_pred.shape[1:])
+        y_vae = center_pad_crop(y_vae, y_rec.shape[1:])
 
         pseudo_loss = self.loss_fn(y_pred, y_true)
         rec_loss = self.loss_fn(y_vae, y_rec) * self.lambd

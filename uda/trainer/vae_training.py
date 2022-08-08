@@ -13,7 +13,7 @@ from ignite.utils import convert_tensor, setup_logger
 from torch.utils.data import DataLoader
 
 from uda.losses import kl_loss
-from uda.models import center_crop_nd
+from uda.models import center_pad_crop
 from uda.trainer.base import BaseEvaluator, dice_score_fn
 from uda.utils import binary_one_hot_output_transform, pipe
 
@@ -31,7 +31,7 @@ class VaeEvaluator(BaseEvaluator):
             x = convert_tensor(batch[1], idist.device())
             x_rec, mean, v_log = self.model(x)
 
-        x = center_crop_nd(x, x_rec.shape[1:])
+        x = center_pad_crop(x, x_rec.shape[1:])
 
         return x_rec, x, mean, v_log
 
@@ -94,7 +94,7 @@ class VaeTrainer(BaseEvaluator):
         x = convert_tensor(batch[1], idist.device())
         x_rec, mean, v_log = self.model(x)
 
-        x = center_crop_nd(x, x_rec.shape[1:])
+        x = center_pad_crop(x, x_rec.shape[1:])
 
         rec_l = self.loss_fn(x_rec, x)
         kl_l = kl_loss(mean, v_log) * self.beta

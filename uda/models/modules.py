@@ -44,7 +44,11 @@ class ConvBlock(nn.Sequential):
     """Convolutional block."""
 
     def __init__(
-        self, dim: int, channels: list[int], batch_norm: bool = True, track_running_stats: bool = False
+        self,
+        dim: int,
+        channels: list[int],
+        batch_norm: bool = True,
+        track_running_stats: bool = False,
     ) -> None:
         """Args:
         `channels` : Number of channels in each convolutional layer.
@@ -131,30 +135,24 @@ class DownsampleBlock(nn.Module):
         return x
 
 
-class CenterCropNd(nn.Module):
-    def __init__(self, *shape: int) -> None:
+class CenterPadCrop(nn.Module):
+    def __init__(self, *shape: int, mode: str = "constant", value: float = 0) -> None:
         super().__init__()
         self.shape = shape
+        self.mode = mode
+        self.value = value
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return center_crop_nd(x, self.shape)
+        return center_pad_crop(x, self.shape, self.mode, self.value)
 
 
-def center_crop_nd(x: torch.Tensor, shape: tuple[int, ...]) -> torch.Tensor:
-    # reverse the shape/sizes because we will iterate from back-2-front
-    sizes = reversed(x.shape[-len(shape) :])
-    shape = reversed(shape)
+def center_pad_crop(x: torch.Tensor, size: tuple[int, ...], mode: str = "constant", value: float = 0) -> torch.Tensor:
+    pad = []
+    for i in range(1, len(size) + 1):
+        excess = (size[-i] - x.size(-i)) / 2
+        pad.extend([floor(excess), ceil(excess)])
 
-    for i, (size, target) in enumerate(zip(sizes, shape), start=1):
-        if target > size:
-            raise RuntimeError("shape mismatch: target size must be smaller (or equal) tensor size.")
-        if size > target:
-            start_index = floor((size - target) / 2)
-            end_index = ceil((size - target) / 2)
-            indices = torch.arange(start_index, size - end_index, device=x.device)
-            x = torch.index_select(x, -i, indices)
-
-    return x
+    return torch.nn.functional.pad(x, pad, mode, value)
 
 
 def ConvNd(dim: int, *args, **kwargs) -> Union[nn.Conv1d, nn.Conv2d, nn.Conv3d]:

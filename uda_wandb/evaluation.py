@@ -15,7 +15,7 @@ from uda import HParams, pipe, reshape_to_volume, sigmoid_round_output_transform
 from uda.datasets import CC359
 from uda.metrics import dice_score
 from uda.models import VAE, UNet, UNetConfig, VAEConfig
-from uda.models.modules import center_crop_nd
+from uda.models.modules import center_pad_crop
 from uda.trainer import SegEvaluator, VaeEvaluator
 from uda_wandb.config import RunConfig
 
@@ -53,7 +53,7 @@ def evaluate_vae(run_cfg: RunConfig, table_plot: bool = True, table_size: int = 
 
         preds = torch.cat(preds).numpy()
         g_truths = torch.cat(g_truths).numpy()
-        data = center_crop_nd(dataset.val_split.tensors[0], preds.shape[-len(dataset.imsize) :]).numpy()
+        data = center_pad_crop(dataset.val_split.tensors[0], preds.shape[-len(dataset.imsize) :]).numpy()
 
         preds = reshape_to_volume(preds, model.config.dim, dataset.imsize, dataset.patch_size)
         g_truths = reshape_to_volume(g_truths, model.config.dim, dataset.imsize, dataset.patch_size)

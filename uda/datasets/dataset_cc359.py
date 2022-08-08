@@ -12,6 +12,8 @@ from sklearn.preprocessing import MinMaxScaler
 from torch.utils.data import DataLoader, TensorDataset
 from tqdm import tqdm
 
+from uda.models.modules import center_pad_crop
+
 from .configuration_cc359 import CC359Config
 
 
@@ -49,34 +51,50 @@ class CC359:
 
         scaler = MinMaxScaler()
 
-        images, labels, spacings_mm = [], [], []
+        images, masks, spacings_mm = [], [], []
         for file in tqdm(files, desc="Loading files"):
             nib_img: SpatialImage = nib.load(file)
             img = nib_img.get_fdata("unchanged", dtype=np.float32)
 
             nib_label: SpatialImage = nib.load(labels_dir / (file.name[:-7] + "_ss.nii.gz"))
-            targets = nib_label.get_fdata("unchanged", dtype=np.float32)
+            mask = nib_label.get_fdata("unchanged", dtype=np.float32)
 
             # clip & scale the images
             if self.config.clip_intensities is not None:
                 img = img.clip(min=self.config.clip_intensities[0], max=self.config.clip_intensities[1])
             img = scaler.fit_transform(img.reshape(-1, 1)).reshape(img.shape)
 
-            if self.config.rotate is not None:
-                img = np.rot90(img, k=self.config.rotate, axes=(1, 2))
-                targets = np.rot90(targets, k=self.config.rotate, axes=(1, 2))
+            # from here on -> torch backend
+            img = torch.from_numpy(img)
+            mask = torch.from_numpy(mask)
 
-            # pad the images
-            img = self._pad_array(img)
-            targets = self._pad_array(targets)
+            if self.config.rotate is not None:
+                img = torch.rot90(img, k=self.config.rotate, dims=(1, 2))
+                mask = torch.rot90(mask, k=self.config.rotate, dims=(1, 2))
+
+            img = center_pad_crop(img, self.imsize)
+            mask = center_pad_crop(mask, self.imsize)
 
             images.append(img)
-            labels.append(targets)
-            spacings_mm.append(np.array(nib_img.header.get_zooms()))
+            masks.append(mask)
+            spacings_mm.append(torch.Tensor(nib_img.header.get_zooms()))
 
-        data = np.stack(images)
-        targets = np.stack(labels)
-        self.spacings_mm = np.stack(spacings_mm)
+        # stack and pad/crop
+        data = torch.stack(images)
+        targets = torch.stack(masks)
+        self.spacings_mm = torch.stack(spacings_mm)
+
+        if self.patch_size is not None:
+            n = len(data)
+            # sadly patchify only works with numpy arrays
+            data = patchify(data.reshape(-1, *data.shape[-2:]).numpy(), self.patch_size, self.patch_size).reshape(
+                n, -1, *self.patch_size
+            )
+            data = torch.from_numpy(data)
+            targets = patchify(
+                targets.reshape(-1, *targets.shape[-2:]).numpy(), self.patch_size, self.patch_size
+            ).reshape(n, -1, *self.patch_size)
+            targets = torch.from_numpy(targets)
 
         # split data & targets into train/val
         kf = KFold(n_splits=3, shuffle=True, random_state=self.random_state)
@@ -84,75 +102,24 @@ class CC359:
         X_train, X_val = data[train_indices], data[val_indices]
         y_train, y_val = targets[train_indices], targets[val_indices]
 
-        if self.patch_size is not None:
-            # patchify X_train
-            X_train = patchify(X_train.reshape(-1, *X_train.shape[-2:]), self.patch_size, self.patch_size).reshape(
-                -1, *self.patch_size
-            )
-            # patchify X_val
-            X_val = patchify(X_val.reshape(-1, *X_val.shape[-2:]), self.patch_size, self.patch_size).reshape(
-                -1, *self.patch_size
-            )
-            # patchify y_train
-            y_train = patchify(y_train.reshape(-1, *y_train.shape[-2:]), self.patch_size, self.patch_size).reshape(
-                -1, *self.patch_size
-            )
-            # patchify y_val
-            y_val = patchify(y_val.reshape(-1, *y_val.shape[-2:]), self.patch_size, self.patch_size).reshape(
-                -1, *self.patch_size
-            )
-
+        # optional flatten & add channel dim
         if self.config.flatten:
             # flatten 3d volumes to 2d images
-            X_train = X_train.reshape(-1, *X_train.shape[-2:])
-            X_val = X_val.reshape(-1, *X_val.shape[-2:])
-            y_train = y_train.reshape(-1, *y_train.shape[-2:])
-            y_val = y_val.reshape(-1, *y_val.shape[-2:])
+            X_train = X_train.reshape(-1, *X_train.shape[-2:]).unsqueeze(1)
+            X_val = X_val.reshape(-1, *X_val.shape[-2:]).unsqueeze(1)
+            y_train = y_train.reshape(-1, *y_train.shape[-2:]).unsqueeze(1)
+            y_val = y_val.reshape(-1, *y_val.shape[-2:]).unsqueeze(1)
+        else:
+            X_train = X_train.reshape(-1, *X_train.shape[-3:]).unsqueeze(1)
+            X_val = X_val.reshape(-1, *X_val.shape[-3:]).unsqueeze(1)
+            y_train = y_train.reshape(-1, *y_train.shape[-3:]).unsqueeze(1)
+            y_val = y_val.reshape(-1, *y_val.shape[-3:]).unsqueeze(1)
 
-        # add channel dimension
-        X_train = np.expand_dims(X_train, 1)
-        X_val = np.expand_dims(X_val, 1)
-        y_train = np.expand_dims(y_train, 1)
-        y_val = np.expand_dims(y_val, 1)
-
-        self.train_split = TensorDataset(torch.from_numpy(X_train), torch.from_numpy(y_train))
-        self.val_split = TensorDataset(torch.from_numpy(X_val), torch.from_numpy(y_val))
+        self.train_split = TensorDataset(X_train, y_train)
+        self.val_split = TensorDataset(X_val, y_val)
 
     def train_dataloader(self, batch_size: int):
         return DataLoader(self.train_split, batch_size=batch_size, shuffle=True)
 
     def val_dataloader(self, batch_size: int):
         return DataLoader(self.val_split, batch_size=batch_size, shuffle=False)
-
-    def _pad_array(self, arr: np.ndarray, mode: str = "edge") -> np.ndarray:
-        depth, width, height = self.imsize
-
-        # center crop image if too large
-        if arr.shape[0] > depth:
-            z = (
-                int(np.floor((arr.shape[0] - depth) / 2)),
-                int(np.ceil((arr.shape[0] - depth) / 2)),
-            )
-            arr = arr[z[0] : -z[1]]
-        if arr.shape[1] > width:
-            x = (
-                int(np.floor((arr.shape[1] - width) / 2)),
-                int(np.ceil((arr.shape[1] - width) / 2)),
-            )
-            arr = arr[:, x[0] : -x[1]]
-        if arr.shape[2] > height:
-            y = (
-                int(np.floor((arr.shape[2] - height) / 2)),
-                int(np.ceil((arr.shape[2] - height) / 2)),
-            )
-            arr = arr[:, :, y[0] : -y[1]]
-
-        # pad image
-        if arr.shape[0] < depth:
-            arr = np.pad(arr, ((0, depth - arr.shape[0]), (0, 0), (0, 0)), mode=mode)
-        if arr.shape[1] < width:
-            arr = np.pad(arr, ((0, 0), (0, width - arr.shape[1]), (0, 0)), mode=mode)
-        if arr.shape[2] < height:
-            arr = np.pad(arr, ((0, 0), (0, 0), (0, height - arr.shape[2])), mode=mode)
-
-        return arr

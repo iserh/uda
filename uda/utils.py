@@ -11,26 +11,25 @@ def reshape_to_volume(
     data: Union[np.ndarray, torch.Tensor],
     dim: int,
     imsize: tuple[int, int, int],
-    patch_size: Optional[tuple[int, int, int]],
+    patch_size: Optional[tuple[int, int, int]] = None,
 ) -> Union[np.ndarray, torch.Tensor]:
     imsize = tuple(imsize)
     # check if torch.Tensor (patchify uses numpy backend)
-    if isinstance(data, torch.Tensor):
-        data = data.numpy()
-        output_type_tensor = True
-    else:
-        output_type_tensor = False
+    output_type_tensor = isinstance(data, torch.Tensor)
+    data = data.numpy() if output_type_tensor else data
 
     # unpatchify if data is patchified
     if patch_size is not None:
+        # ensure tuple typing
         patch_size = tuple(patch_size)
         # compute number of patches for each axis
         n_patches = [axis_size // patch_size for axis_size, patch_size in zip(imsize, patch_size)]
-        cropped_patch_size = (
-            patch_size[:-dim] + data.shape[-dim:]
-        )  # if data was cropped due to down/upsampling inaccuracies
+        # size of the actual data patches (might be cropped due to down-/upsampling)
+        cropped_patch_size = patch_size[:-dim] + data.shape[-dim:]
+        # size of the final (cropped) image
         cropped_imsize = [ps * np for ps, np in zip(cropped_patch_size, n_patches)]
-        batch_size = int(data.shape[0] // (np.prod(n_patches) * np.prod(imsize[:-dim])))
+        # get the batch size
+        batch_size = int(data.shape[0] // (np.prod(n_patches[-dim:]) * np.prod(imsize[:-dim])))
         # subsume batch_size in first patch axis (z-axis)
         data = data.reshape(batch_size * n_patches[0], *n_patches[1:], *cropped_patch_size)
         # unpatchify (subsume batch_size in first image axis)
