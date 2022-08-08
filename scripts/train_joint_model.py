@@ -105,7 +105,6 @@ if __name__ == "__main__":
 
     # load configuration
     hparams = HParams.from_file(args.config / "hparams.yaml")
-    model_config = UNetConfig.from_file(args.config / "model.yaml")
     dataset = CC359(args.config / "dataset.yaml", root=args.data)
 
     if args.wandb:
@@ -143,8 +142,7 @@ if __name__ == "__main__":
             config={
                 "hparams": hparams.__dict__,
                 "dataset": dataset.config.__dict__,
-                "model": model_config.__dict__,
-                "teacher": teacher.config.__dict__,
+                "model": teacher.config.__dict__,
                 "vae": vae.config.__dict__,
                 "teacher_dataset": teacher_ds_cfg.__dict__,
                 "teacher_run": teacher_run.__dict__,
@@ -157,7 +155,7 @@ if __name__ == "__main__":
             cfg_dir = Path(r.dir) / "config"
             cfg_dir.mkdir()
             hparams.save(cfg_dir / "hparams.yaml")
-            model_config.save(cfg_dir / "model.yaml")
+            teacher.config.save(cfg_dir / "model.yaml")
             dataset.config.save(cfg_dir / "dataset.yaml")
 
             download_dataset(dataset)
