@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 from pathlib import Path
 
-import wandb
 from ignite.contrib.handlers.tqdm_logger import ProgressBar
 from ignite.contrib.handlers.wandb_logger import WandBLogger
 from ignite.engine import Events
@@ -14,7 +13,7 @@ from uda.trainer import VaeTrainer, vae_standard_metrics
 from uda_wandb import vae_table_plot
 
 
-def run(dataset: CC359, hparams: HParams, model_config: VAEConfig, use_wandb: bool = False):
+def run(dataset: CC359, hparams: HParams, model_config: VAEConfig, use_wandb: bool = False) -> None:
     if use_wandb:
         import wandb
 

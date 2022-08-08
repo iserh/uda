@@ -118,8 +118,8 @@ class CC359:
         self.train_split = TensorDataset(X_train, y_train)
         self.val_split = TensorDataset(X_val, y_val)
 
-    def train_dataloader(self, batch_size: int):
+    def train_dataloader(self, batch_size: int) -> DataLoader:
         return DataLoader(self.train_split, batch_size=batch_size, shuffle=True)
 
-    def val_dataloader(self, batch_size: int):
+    def val_dataloader(self, batch_size: int) -> DataLoader:
         return DataLoader(self.val_split, batch_size=batch_size, shuffle=False)

@@ -1,16 +1,7 @@
 """Loader for the Calgary Campinas dataset."""
-from pathlib import Path
-from typing import Union
-
 import ignite.distributed as idist
-import nibabel as nib
-import numpy as np
 import torch
 import torch.nn as nn
-from nibabel.spatialimages import SpatialImage
-from patchify import patchify
-from sklearn.model_selection import KFold
-from sklearn.preprocessing import MinMaxScaler
 from torch.utils.data import DataLoader, TensorDataset
 from tqdm import tqdm
 
@@ -49,8 +40,8 @@ class TeacherData:
         self.model.cpu()
         return preds
 
-    def train_dataloader(self, batch_size: int):
+    def train_dataloader(self, batch_size: int) -> DataLoader:
         return DataLoader(self.train_split, batch_size=batch_size, shuffle=True)
 
-    def val_dataloader(self, batch_size: int):
+    def val_dataloader(self, batch_size: int) -> DataLoader:
         return DataLoader(self.val_split, batch_size=batch_size, shuffle=False)

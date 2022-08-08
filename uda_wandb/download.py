@@ -119,7 +119,7 @@ def download_old_model(run_cfg: RunConfig, path: Union[Path, str] = "/tmp/models
 
     print(f"Converting OLD model (class={ModelClass.__name__})")
 
-    config = ConfigClass.from_file(path / f"model.yaml")
+    config = ConfigClass.from_file(path / "model.yaml")
     model = ModelClass(config)
     # begin workaround
     for m in model.modules():

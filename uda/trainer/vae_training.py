@@ -1,7 +1,6 @@
-from abc import ABC, abstractmethod
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Optional
+from typing import Optional
 
 import ignite.distributed as idist
 import torch
@@ -9,7 +8,7 @@ import torch.nn as nn
 from ignite.engine import Engine, Events
 from ignite.handlers import EarlyStopping, ModelCheckpoint
 from ignite.metrics import ConfusionMatrix, DiceCoefficient, Loss, Metric
-from ignite.utils import convert_tensor, setup_logger
+from ignite.utils import convert_tensor
 from torch.utils.data import DataLoader
 
 from uda.losses import kl_loss
@@ -19,7 +18,7 @@ from uda.utils import binary_one_hot_output_transform, pipe
 
 
 class VaeEvaluator(BaseEvaluator):
-    def __init__(self, model: nn.Module):
+    def __init__(self, model: nn.Module) -> None:
         super(VaeEvaluator, self).__init__()
         self.model = model.to(idist.device())
 
@@ -48,7 +47,7 @@ class VaeTrainer(BaseEvaluator):
         metrics: Optional[dict[str, Metric]] = None,
         score_function: Optional[Callable[[Engine], float]] = dice_score_fn,
         cache_dir: Path = Path("/tmp/models"),
-    ):
+    ) -> None:
         super(VaeTrainer, self).__init__()
         self.model = model.to(idist.device())
         self.optim = optim

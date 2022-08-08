@@ -1,6 +1,5 @@
 """U-Net configuration."""
 from dataclasses import dataclass
-from typing import Optional
 
 from uda.config import Config
 

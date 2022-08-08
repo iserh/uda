@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 from pathlib import Path
 
-import wandb
 from ignite.contrib.handlers.tqdm_logger import ProgressBar
 from ignite.contrib.handlers.wandb_logger import WandBLogger
 from ignite.engine import Events

@@ -19,7 +19,7 @@ def compute_hidden_size(
     hidden_sizes = []
     for size in input_size:
         W = size
-        hidden_sizes.append([(W := floor((W - K + 2 * P) / S + 1)) for _ in range(n_blocks)][-1])
+        hidden_sizes.append([(W := floor((W - K + 2 * P) / S + 1)) for _ in range(n_blocks)][-1])  # noqa: F841
 
     return hidden_sizes
 

@@ -1,5 +1,4 @@
 """Evaluation functions for wandb."""
-from pathlib import Path
 from tempfile import TemporaryDirectory
 
 import ignite.distributed as idist
@@ -14,7 +13,7 @@ from tqdm import tqdm
 from uda import HParams, pipe, reshape_to_volume, sigmoid_round_output_transform, to_cpu_output_transform
 from uda.datasets import CC359
 from uda.metrics import dice_score
-from uda.models import VAE, UNet, UNetConfig, VAEConfig
+from uda.models import VAE, UNet
 from uda.models.modules import center_pad_crop
 from uda.trainer import SegEvaluator, VaeEvaluator
 from uda_wandb.config import RunConfig
@@ -312,7 +311,7 @@ def vae_table_plot(
     imsize: tuple[int, int, int],
     patch_size: tuple[int, int, int],
     table_size: int = 5,
-):
+) -> None:
     print()
     print("Creating VAE reconstruction table")
     preds, targets = [*zip(*evaluator.state.output)]
@@ -382,7 +381,7 @@ def segmentation_table_plot(
     imsize: tuple[int, int, int],
     patch_size: tuple[int, int, int],
     table_size: int = 5,
-):
+) -> None:
     print()
     print("Creating Segmentation prediction table")
     preds, targets, data = [*zip(*evaluator.state.output)]
