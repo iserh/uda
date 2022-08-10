@@ -101,13 +101,11 @@ def run(teacher: UNet, vae: VAE, dataset: UDADataset, hparams: HParams, use_wand
 if __name__ == "__main__":
     from commons import get_args
 
-    from uda.datasets import CC359
-
     args = get_args()
 
     # load configuration
     hparams = HParams.from_file(args.config / "hparams.yaml")
-    dataset = CC359(args.config / "dataset.yaml", root=args.data)
+    dataset: UDADataset = args.dataset(args.config / "dataset.yaml", root=args.data)
 
     if args.wandb:
         import wandb

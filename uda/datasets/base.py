@@ -1,11 +1,17 @@
 """Loader for the M&Ms dataset."""
-from abc import abstractmethod
+from abc import abstractmethod, abstractproperty
 from typing import Optional
 
 from torch.utils.data import DataLoader
 
+from uda.config import Config
+
 
 class UDADataset:
+    @abstractproperty
+    def config(self) -> Config:
+        ...
+
     @abstractmethod
     def setup(self) -> None:
         ...

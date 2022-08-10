@@ -13,10 +13,11 @@ from tqdm import tqdm
 
 from uda.models.modules import center_pad_crop
 
+from .base import UDADataset
 from .configuration_mms import MAndMsConfig
 
 
-class MAndMs:
+class MAndMs(UDADataset):
     """M&Ms data module.
 
     Args:
@@ -42,6 +43,14 @@ class MAndMs:
         self.patch_size = config.patch_size
         self.clip_intensities = config.clip_intensities
         self.limit = config.limit
+
+    @property
+    def config(self) -> MAndMsConfig:
+        return self._config
+
+    @config.setter
+    def config(self, config: MAndMsConfig) -> None:
+        self._config = config
 
     def setup(self) -> None:
         """Load data from disk and preprocess."""

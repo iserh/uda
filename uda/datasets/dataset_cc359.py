@@ -43,6 +43,14 @@ class CC359(UDADataset):
         self.clip_intensities = config.clip_intensities
         self.random_state = config.random_state
 
+    @property
+    def config(self) -> CC359Config:
+        return self._config
+
+    @config.setter
+    def config(self, config: CC359Config) -> None:
+        self._config = config
+
     def setup(self) -> None:
         """Load data from disk, preprocess and split."""
         images_dir = self.root / "Original" / self.vendor

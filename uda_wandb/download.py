@@ -9,7 +9,7 @@ import wandb
 import yaml
 from torch.nn import BatchNorm1d, BatchNorm2d, BatchNorm3d
 
-from uda.datasets import UDADataset
+from uda.datasets import DatasetType, UDADataset
 from uda.models import VAE, UNet, UNetConfig, VAEConfig
 from uda_wandb.config import RunConfig
 
@@ -26,12 +26,12 @@ def _move_all_files(src: str, dest: str) -> None:
         shutil.move(file_path, dest)
 
 
-def download_dataset(dataset: UDADataset, root: str = "/tmp/data") -> Path:
+def download_dataset(dataset: type[UDADataset], root: str = "/tmp/data") -> Path:
     root = Path(root)
 
     api = wandb.Api()
     artifact = api.artifact(dataset.artifact_name)
-    path = artifact.download(root=root / dataset.__class__.__name__)
+    path = artifact.download(root=root / dataset.__name__)
     return path
 
 
@@ -145,11 +145,10 @@ def download_old_model(run_cfg: RunConfig, path: str = "/tmp/models/model") -> P
 if __name__ == "__main__":
     from argparse import ArgumentParser
 
-    from uda.datasets import CC359
-
     parser = ArgumentParser()
     parser.add_argument("project", type=str)
     parser.add_argument("run_id", type=str)
+    parser.add_argument("--dataset", type=DatasetType, default="CC359")
     parser.add_argument("--object", type=str, default="config")
     parser.add_argument("--path", type=Path, default="config")
     parser.add_argument("-o", "--old", action="store_true")
@@ -162,4 +161,4 @@ if __name__ == "__main__":
     elif args.object == "model":
         download_model(run_cfg, path=args.path, old=args.old)
     elif args.object == "dataset":
-        download_dataset(CC359)
+        download_dataset(args.dataset)
