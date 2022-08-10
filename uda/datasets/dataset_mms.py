@@ -160,6 +160,6 @@ class MAndMs(UDADataset):
             targets = targets.reshape(-1, *targets.shape[-3:]).unsqueeze(1)
 
         # encode targets as onehot
-        targets = to_onehot(targets, num_classes=4)  # [:, 1:, ...]
+        targets = to_onehot(targets, num_classes=4).float()  # [:, 1:, ...]
 
         return TensorDataset(data, targets), spacings
