@@ -7,13 +7,13 @@ from ignite.engine import Events
 from ignite.handlers import EpochOutputStore
 
 from uda import HParams, get_criterion, optimizer_cls, pipe, sigmoid_round_output_transform, to_cpu_output_transform
-from uda.datasets import CC359
+from uda.datasets import UDADataset
 from uda.models import UNet, UNetConfig
 from uda.trainer import SegTrainer, segmentation_standard_metrics
 from uda_wandb.evaluation import segmentation_table_plot
 
 
-def run(dataset: CC359, hparams: HParams, model_config: UNetConfig, use_wandb: bool = True) -> None:
+def run(dataset: UDADataset, hparams: HParams, model_config: UNetConfig, use_wandb: bool = True) -> None:
     if use_wandb:
         import wandb
 
@@ -80,6 +80,8 @@ def run(dataset: CC359, hparams: HParams, model_config: UNetConfig, use_wandb: b
 
 if __name__ == "__main__":
     from commons import get_args
+
+    from uda.datasets import CC359
 
     args = get_args()
 

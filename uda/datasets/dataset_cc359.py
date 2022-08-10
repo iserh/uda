@@ -1,6 +1,6 @@
 """Loader for the Calgary Campinas dataset."""
 from pathlib import Path
-from typing import Union
+from typing import Optional, Union
 
 import nibabel as nib
 import numpy as np
@@ -14,10 +14,11 @@ from tqdm import tqdm
 
 from uda.models.modules import center_pad_crop
 
+from .base import UDADataset
 from .configuration_cc359 import CC359Config
 
 
-class CC359:
+class CC359(UDADataset):
     """Calgary Campinas data module.
 
     Args:
@@ -124,8 +125,10 @@ class CC359:
         self.train_split = TensorDataset(X_train, y_train)
         self.val_split = TensorDataset(X_val, y_val)
 
-    def train_dataloader(self, batch_size: int) -> DataLoader:
+    def train_dataloader(self, batch_size: Optional[int] = None) -> DataLoader:
+        batch_size = batch_size or len(self.train_split)
         return DataLoader(self.train_split, batch_size=batch_size, shuffle=True)
 
-    def val_dataloader(self, batch_size: int) -> DataLoader:
+    def val_dataloader(self, batch_size: Optional[int] = None) -> DataLoader:
+        batch_size = batch_size or len(self.val_split)
         return DataLoader(self.val_split, batch_size=batch_size, shuffle=False)

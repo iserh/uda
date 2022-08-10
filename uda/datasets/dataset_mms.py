@@ -1,6 +1,6 @@
 """Loader for the M&Ms dataset."""
 from pathlib import Path
-from typing import Union
+from typing import Optional, Union
 
 import nibabel as nib
 import numpy as np
@@ -53,13 +53,16 @@ class MAndMs:
         self.val_split, self.val_spacings = self._load_files(self.root / "Validation")
         self.test_split, self.test_spacings = self._load_files(self.root / "Testing")
 
-    def train_dataloader(self, batch_size: int) -> DataLoader:
+    def train_dataloader(self, batch_size: Optional[int] = None) -> DataLoader:
+        batch_size = batch_size or len(self.train_split)
         return DataLoader(self.train_split, batch_size=batch_size, shuffle=True)
 
-    def val_dataloader(self, batch_size: int) -> DataLoader:
+    def val_dataloader(self, batch_size: Optional[int] = None) -> DataLoader:
+        batch_size = batch_size or len(self.val_split)
         return DataLoader(self.val_split, batch_size=batch_size, shuffle=False)
 
-    def test_dataloader(self, batch_size: int) -> DataLoader:
+    def test_dataloader(self, batch_size: Optional[int] = None) -> DataLoader:
+        batch_size = batch_size or len(self.test_split)
         return DataLoader(self.test_split, batch_size=batch_size, shuffle=False)
 
     def _load_files(self, directory: Path) -> tuple[TensorDataset, torch.Tensor]:

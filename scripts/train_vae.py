@@ -7,13 +7,13 @@ from ignite.engine import Events
 from ignite.handlers import EpochOutputStore
 
 from uda import HParams, get_criterion, optimizer_cls, pipe, sigmoid_round_output_transform, to_cpu_output_transform
-from uda.datasets import CC359
+from uda.datasets import UDADataset
 from uda.models import VAE, VAEConfig
 from uda.trainer import VaeTrainer, vae_standard_metrics
 from uda_wandb import vae_table_plot
 
 
-def run(dataset: CC359, hparams: HParams, model_config: VAEConfig, use_wandb: bool = False) -> None:
+def run(dataset: UDADataset, hparams: HParams, model_config: VAEConfig, use_wandb: bool = False) -> None:
     if use_wandb:
         import wandb
 
@@ -64,7 +64,7 @@ def run(dataset: CC359, hparams: HParams, model_config: VAEConfig, use_wandb: bo
             event_name=Events.EPOCH_COMPLETED,
             handler=vae_table_plot,
             evaluator=trainer.val_evaluator,
-            data=dataset.val_split.tensors[0],
+            data=next(iter(dataset.val_dataloader())),
             dim=model.config.dim,
             imsize=dataset.imsize,
             patch_size=dataset.patch_size,
@@ -80,6 +80,8 @@ def run(dataset: CC359, hparams: HParams, model_config: VAEConfig, use_wandb: bo
 
 if __name__ == "__main__":
     from commons import get_args
+
+    from uda.datasets import CC359
 
     args = get_args()
 

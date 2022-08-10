@@ -5,13 +5,13 @@ import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
 from tqdm import tqdm
 
-from .dataset_cc359 import CC359
+from .base import UDADataset
 
 
 class TeacherData:
     """Calgary Campinas data module."""
 
-    def __init__(self, model: nn.Module, dataset: CC359) -> None:
+    def __init__(self, model: nn.Module, dataset: UDADataset) -> None:
         """Args:
         `model` : Teacher model
         `dataset` : Dataset

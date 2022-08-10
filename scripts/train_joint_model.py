@@ -8,14 +8,14 @@ from ignite.handlers import EpochOutputStore
 from torch.optim.lr_scheduler import LinearLR
 
 from uda import HParams, get_criterion, optimizer_cls, pipe, sigmoid_round_output_transform, to_cpu_output_transform
-from uda.datasets import CC359
+from uda.datasets import UDADataset
 from uda.datasets.dataset_teacher import TeacherData
 from uda.models import VAE, UNet
 from uda.trainer import JointTrainer, joint_standard_metrics
 from uda_wandb import segmentation_table_plot
 
 
-def run(teacher: UNet, vae: VAE, dataset: CC359, hparams: HParams, use_wandb: bool = False) -> None:
+def run(teacher: UNet, vae: VAE, dataset: UDADataset, hparams: HParams, use_wandb: bool = False) -> None:
     if use_wandb:
         import wandb
 
@@ -100,6 +100,8 @@ def run(teacher: UNet, vae: VAE, dataset: CC359, hparams: HParams, use_wandb: bo
 
 if __name__ == "__main__":
     from commons import get_args
+
+    from uda.datasets import CC359
 
     args = get_args()
 
