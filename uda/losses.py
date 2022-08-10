@@ -15,34 +15,20 @@ class LossCriterion(str, Enum):
 class DiceWithLogitsLoss(nn.Module):
     """Combines Sigmoid layer and DiceLoss."""
 
-    def __init__(
-        self,
-        sigmoid: bool = True,
-        softmax: bool = False,
-        squared_pred: bool = True,
-        smooth: float = 1,
-    ) -> None:
+    def __init__(self, squared_pred: bool = True, smooth: float = 1e-6) -> None:
         super(DiceWithLogitsLoss, self).__init__()
         self.squared_pred = squared_pred
         self.smooth = smooth
-        if sigmoid:
-            self.act = torch.sigmoid
-        elif softmax:
-            # self.act = torch.softmax
-            raise NotImplementedError()
-        else:
-            self.act = nn.Identity()
 
     def forward(self, y_pred: torch.Tensor, y_true: torch.Tensor) -> torch.Tensor:
-        y_pred = self.act(y_pred)
         return dice_loss(y_pred, y_true, self.squared_pred, self.smooth)
 
 
 class DiceBCEWithLogitsLoss(nn.Module):
-    def __init__(self, *args, **kwargs) -> None:
+    def __init__(self, squared_pred: bool = True, smooth: float = 1e-6, *args, **kwargs) -> None:
         super(DiceBCEWithLogitsLoss, self).__init__()
-        self.dice_loss = DiceWithLogitsLoss(*args, **kwargs)
-        self.bce_loss = nn.BCEWithLogitsLoss()
+        self.dice_loss = DiceWithLogitsLoss(squared_pred, smooth)
+        self.bce_loss = nn.BCEWithLogitsLoss(*args, **kwargs)
 
     def forward(self, y_pred: torch.Tensor, y_true: torch.Tensor) -> torch.Tensor:
         return self.bce_loss(y_pred, y_true) + self.dice_loss(y_pred, y_true)
@@ -61,8 +47,13 @@ def dice_loss(
     y_pred: torch.Tensor,
     y_true: torch.Tensor,
     squared_pred: bool = True,
-    smooth: float = 1,
+    smooth: float = 1e-6,
 ) -> torch.Tensor:
+    if y_pred.shape[1] == 1:
+        y_pred = torch.sigmoid(y_pred)
+    else:
+        y_pred = torch.softmax(y_pred, dim=1)
+
     # flatten
     y_pred = y_pred.flatten()
     y_true = y_true.flatten()
