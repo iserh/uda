@@ -146,11 +146,19 @@ class CenterPadCrop(nn.Module):
         return center_pad_crop(x, self.shape, self.mode, self.value)
 
 
-def center_pad_crop(x: torch.Tensor, size: tuple[int, ...], mode: str = "constant", value: float = 0) -> torch.Tensor:
+def center_pad_crop(
+    x: torch.Tensor,
+    size: tuple[int, ...],
+    offset: tuple[int, ...] = 0,
+    mode: str = "constant",
+    value: float = 0,
+) -> torch.Tensor:
+    offset = offset if isinstance(offset, (list, tuple)) else [offset for _ in range(len(size))]
+
     pad = []
     for i in range(1, len(size) + 1):
         excess = (size[-i] - x.size(-i)) / 2
-        pad.extend([floor(excess), ceil(excess)])
+        pad.extend([floor(excess) + offset[-i], ceil(excess) - offset[-i]])
 
     return torch.nn.functional.pad(x, pad, mode, value)
 

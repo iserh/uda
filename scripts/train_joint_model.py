@@ -10,7 +10,7 @@ from torch.optim.lr_scheduler import LinearLR
 from uda import HParams, get_criterion, optimizer_cls, pipe, sigmoid_round_output_transform, to_cpu_output_transform
 from uda.datasets import CC359
 from uda.datasets.dataset_teacher import TeacherData
-from uda.models import VAE, UNet, UNetConfig
+from uda.models import VAE, UNet
 from uda.trainer import JointTrainer, joint_standard_metrics
 from uda_wandb import segmentation_table_plot
 
