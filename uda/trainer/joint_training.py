@@ -12,7 +12,7 @@ from torch.utils.data import DataLoader
 
 from uda.models import VAE, CenterPadCrop, UNet, center_pad_crop
 from uda.trainer.base import BaseEvaluator, dice_score_fn
-from uda.utils import binary_one_hot_output_transform, pipe
+from uda.utils import one_hot_output_transform, pipe
 
 
 class JointEvaluator(BaseEvaluator):
@@ -147,7 +147,7 @@ def joint_standard_metrics(loss_fn: nn.Module, lambd: float) -> dict[str, Metric
         "dice": DiceCoefficient(
             ConfusionMatrix(
                 num_classes=2,
-                output_transform=pipe(lambda o: o[:2], binary_one_hot_output_transform),
+                output_transform=pipe(lambda o: o[:2], one_hot_output_transform),
             ),
             ignore_index=0,
         ),

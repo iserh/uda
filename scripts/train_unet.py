@@ -6,11 +6,11 @@ from ignite.contrib.handlers.wandb_logger import WandBLogger
 from ignite.engine import Events
 from ignite.handlers import EpochOutputStore
 
-from uda import HParams, get_criterion, optimizer_cls, pipe, sigmoid_round_output_transform, to_cpu_output_transform
+from uda import HParams, get_criterion, get_preds_output_transform, optimizer_cls, pipe, to_cpu_output_transform
 from uda.datasets import UDADataset
 from uda.models import UNet, UNetConfig
 from uda.trainer import SegTrainer, segmentation_standard_metrics
-from uda_wandb.evaluation import segmentation_table_plot
+from uda_wandb.evaluation import prediction_image_plot
 
 
 def run(dataset: UDADataset, hparams: HParams, model_config: UNetConfig, use_wandb: bool = True) -> None:
@@ -30,7 +30,7 @@ def run(dataset: UDADataset, hparams: HParams, model_config: UNetConfig, use_wan
         val_loader=dataset.val_dataloader(hparams.val_batch_size),
         loss_fn=loss_fn,
         patience=hparams.early_stopping_patience,
-        metrics=segmentation_standard_metrics(loss_fn),
+        metrics=segmentation_standard_metrics(loss_fn, model.config.out_channels),
         cache_dir=wandb.run.dir if use_wandb else "/tmp/models/student",
     )
 
@@ -54,7 +54,7 @@ def run(dataset: UDADataset, hparams: HParams, model_config: UNetConfig, use_wan
         # wandb table evaluation
         trainer.add_event_handler(
             event_name=Events.EPOCH_COMPLETED,
-            handler=segmentation_table_plot,
+            handler=prediction_image_plot,
             evaluator=trainer.val_evaluator,
             dim=model.config.dim,
             dataset=dataset,
@@ -62,7 +62,7 @@ def run(dataset: UDADataset, hparams: HParams, model_config: UNetConfig, use_wan
         )
         # table evaluation functions needs predictions from validation set
         eos = EpochOutputStore(
-            output_transform=pipe(lambda o: o[:3], sigmoid_round_output_transform, to_cpu_output_transform)
+            output_transform=pipe(lambda o: o[:3], get_preds_output_transform, to_cpu_output_transform)
         )
         eos.attach(trainer.val_evaluator, "output")
 
@@ -91,7 +91,8 @@ if __name__ == "__main__":
     if args.wandb:
         import wandb
 
-        from uda_wandb import RunConfig, cross_evaluate_unet, delete_model_binaries, download_dataset, evaluate_unet
+        from uda.trainer import SegEvaluator
+        from uda_wandb import RunConfig, cross_evaluate_unet, delete_model_binaries, download_dataset, evaluate
 
         with wandb.init(
             project=args.project,
@@ -116,7 +117,7 @@ if __name__ == "__main__":
             run(dataset, hparams, model_config, use_wandb=True)
 
         if args.evaluate:
-            evaluate_unet(dataset, hparams, run_cfg, splits=["validation", "testing"])
+            evaluate(SegEvaluator, UNet, dataset, hparams, run_cfg, splits=["validation", "testing"])
         if args.cross_eval:
             cross_evaluate_unet(run_cfg, table_plot=True)
         if not args.store:

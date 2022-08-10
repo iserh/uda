@@ -6,7 +6,7 @@ from ignite.contrib.handlers.wandb_logger import WandBLogger
 from ignite.engine import Events
 from ignite.handlers import EpochOutputStore
 
-from uda import HParams, get_criterion, optimizer_cls, pipe, sigmoid_round_output_transform, to_cpu_output_transform
+from uda import HParams, get_criterion, get_preds_output_transform, optimizer_cls, pipe, to_cpu_output_transform
 from uda.datasets import UDADataset
 from uda.models import VAE, VAEConfig
 from uda.trainer import VaeTrainer, vae_standard_metrics
@@ -66,12 +66,12 @@ def run(dataset: UDADataset, hparams: HParams, model_config: VAEConfig, use_wand
             evaluator=trainer.val_evaluator,
             data=next(iter(dataset.val_dataloader())),
             dim=model.config.dim,
-            imsize=dataset.imsize,
-            patch_size=dataset.patch_size,
+            dataset=dataset,
+            name="validation",
         )
         # table evaluation functions needs predictions from validation set
         eos = EpochOutputStore(
-            output_transform=pipe(lambda o: o[:2], sigmoid_round_output_transform, to_cpu_output_transform)
+            output_transform=pipe(lambda o: o[:3], get_preds_output_transform, to_cpu_output_transform)
         )
         eos.attach(trainer.val_evaluator, "output")
 
@@ -86,12 +86,13 @@ if __name__ == "__main__":
     # load configuration
     hparams = HParams.from_file(args.config / "hparams.yaml")
     model_config = VAEConfig.from_file(args.config / "model.yaml")
-    dataset = args.dataset(args.config / "dataset.yaml", root=args.data)
+    dataset: UDADataset = args.dataset(args.config / "dataset.yaml", root=args.data)
 
     if args.wandb:
         import wandb
 
-        from uda_wandb import RunConfig, delete_model_binaries, download_dataset, evaluate_vae
+        from uda.trainer import VaeEvaluator
+        from uda_wandb import RunConfig, delete_model_binaries, download_dataset, evaluate
 
         with wandb.init(
             project=args.project,
@@ -116,7 +117,7 @@ if __name__ == "__main__":
             run(dataset, hparams, model_config, use_wandb=True)
 
         if args.evaluate:
-            evaluate_vae(run_cfg, table_plot=True)
+            evaluate(VaeEvaluator, VAE, run_cfg, dataset, hparams, run_cfg, splits=["validation"])
         if not args.store:
             delete_model_binaries(run_cfg)
     else:

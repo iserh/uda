@@ -5,11 +5,11 @@ from .config import Config  # noqa: F401
 from .hparams import HParams, LossCriterion, Optimizer  # noqa: F401
 from .losses import get_criterion, optimizer_cls  # noqa: F401
 from .utils import (  # noqa: F401
-    binary_one_hot_output_transform,
     flatten_output_transform,
+    get_preds_output_transform,
+    one_hot_output_transform,
     pipe,
     reshape_to_volume,
-    sigmoid_round_output_transform,
     to_cpu_output_transform,
 )
 

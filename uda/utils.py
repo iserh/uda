@@ -53,23 +53,40 @@ def pipe(*transforms: Callable) -> Callable:
     return output_transform
 
 
-def binary_one_hot_output_transform(output: tuple[torch.Tensor, torch.Tensor]) -> tuple[torch.Tensor, torch.Tensor]:
+def one_hot_output_transform(output: tuple[torch.Tensor, torch.Tensor]) -> tuple[torch.Tensor, torch.Tensor]:
     y_pred, y_true = output[:2]
     rest = output[2:] if len(output) > 2 else []
 
-    y_pred = y_pred.sigmoid().round()
-    y_pred = to_onehot(y_pred.long(), 2)
+    if y_pred.shape[1] == 1:
+        n_classes = 2
+        preds = y_pred.sigmoid().round().long()
+        targets = y_true.long()
+    else:
+        n_classes = y_pred.shape[1]
+        preds = y_pred.argmax(1)
+        targets = y_true.argmax(1)
 
-    return y_pred, y_true.long(), *rest
+    preds = to_onehot(preds, num_classes=n_classes)
+
+    return preds, targets, *rest
 
 
 def to_cpu_output_transform(output: tuple[torch.Tensor, ...]) -> tuple[torch.Tensor, ...]:
     return [tensor.cpu() for tensor in output]
 
 
-def sigmoid_round_output_transform(output: tuple[torch.Tensor, torch.Tensor]) -> tuple[torch.Tensor, torch.Tensor]:
-    y_pred = output[0]
-    return y_pred.sigmoid().round(), *output[1:]
+def get_preds_output_transform(output: tuple[torch.Tensor, torch.Tensor]) -> tuple[torch.Tensor, torch.Tensor]:
+    y_pred, y_true = output[:2]
+    rest = output[2:] if len(output) > 2 else []
+
+    if y_pred.shape[1] == 1:
+        preds = y_pred.sigmoid().round().long()
+        targets = y_true.long()
+    else:
+        preds = y_pred.argmax(1)
+        targets = y_true.argmax(1)
+
+    return preds, targets, *rest
 
 
 def flatten_output_transform(output: tuple[torch.Tensor, torch.Tensor], dim: int = 0) -> None:

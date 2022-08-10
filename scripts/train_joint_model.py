@@ -7,12 +7,12 @@ from ignite.engine import Events
 from ignite.handlers import EpochOutputStore
 from torch.optim.lr_scheduler import LinearLR
 
-from uda import HParams, get_criterion, optimizer_cls, pipe, sigmoid_round_output_transform, to_cpu_output_transform
+from uda import HParams, get_criterion, get_preds_output_transform, optimizer_cls, pipe, to_cpu_output_transform
 from uda.datasets import UDADataset
 from uda.datasets.dataset_teacher import TeacherData
 from uda.models import VAE, UNet
 from uda.trainer import JointTrainer, joint_standard_metrics
-from uda_wandb import segmentation_table_plot
+from uda_wandb import prediction_image_plot
 
 
 def run(teacher: UNet, vae: VAE, dataset: UDADataset, hparams: HParams, use_wandb: bool = False) -> None:
@@ -69,7 +69,7 @@ def run(teacher: UNet, vae: VAE, dataset: UDADataset, hparams: HParams, use_wand
         # wandb table evaluation
         trainer.add_event_handler(
             event_name=Events.EPOCH_COMPLETED,
-            handler=segmentation_table_plot,
+            handler=prediction_image_plot,
             evaluator=trainer.val_evaluator,
             dim=model.config.dim,
             class_labels=dataset.class_labels,
@@ -78,7 +78,7 @@ def run(teacher: UNet, vae: VAE, dataset: UDADataset, hparams: HParams, use_wand
         )
         # table evaluation functions needs predictions from validation set
         eos = EpochOutputStore(
-            output_transform=pipe(lambda o: (*o[:2], o[4]), sigmoid_round_output_transform, to_cpu_output_transform)
+            output_transform=pipe(lambda o: (*o[:2], o[4]), get_preds_output_transform, to_cpu_output_transform)
         )
         eos.attach(trainer.val_evaluator, "output")
 
@@ -118,7 +118,7 @@ if __name__ == "__main__":
             delete_model_binaries,
             download_dataset,
             download_model,
-            evaluate_unet,
+            evaluate,
         )
 
         if args.download:
@@ -163,7 +163,7 @@ if __name__ == "__main__":
             run(teacher, vae, dataset, hparams, use_wandb=True)
 
         if args.evaluate:
-            evaluate_unet(run_cfg, table_plot=True)
+            evaluate(run_cfg, table_plot=True)
         if args.cross_eval:
             cross_evaluate_unet(run_cfg, table_plot=True)
         if not args.store:
