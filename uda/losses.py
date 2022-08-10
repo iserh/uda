@@ -1,5 +1,4 @@
 from enum import Enum
-from typing import Any
 
 import torch
 import torch.nn as nn
@@ -13,31 +12,6 @@ class LossCriterion(str, Enum):
     ...
 
 
-class VAELoss(nn.Module):
-    def __init__(
-        self,
-        rec_loss: LossCriterion,
-        rec_loss_kwargs: dict[str, Any] = {},
-        beta: float = 1.0,
-        return_sum: bool = False,
-    ) -> None:
-        super(VAELoss, self).__init__()
-        self.beta = beta
-        self.rec_loss_fn = _LossCriterion[rec_loss].value(**rec_loss_kwargs)
-        self.return_sum = return_sum
-
-    def forward(self, output: tuple[torch.Tensor, ...], x_true: torch.Tensor) -> torch.Tensor:
-        x_rec, mean, v_log = output
-
-        rec_l = self.rec_loss_fn(x_rec, x_true)
-        kl_l = kl_loss(mean, v_log)
-
-        if self.return_sum:
-            return rec_l + self.beta * kl_l
-        else:
-            return rec_l, self.beta * kl_l
-
-
 class DiceWithLogitsLoss(nn.Module):
     """Combines Sigmoid layer and DiceLoss."""
 
@@ -46,13 +20,11 @@ class DiceWithLogitsLoss(nn.Module):
         sigmoid: bool = True,
         softmax: bool = False,
         squared_pred: bool = True,
-        smooth_nr: float = 1,
-        smooth_dr: float = 1,
+        smooth: float = 1,
     ) -> None:
         super(DiceWithLogitsLoss, self).__init__()
         self.squared_pred = squared_pred
-        self.smooth_nr = smooth_nr
-        self.smooth_dr = smooth_dr
+        self.smooth = smooth
         if sigmoid:
             self.act = torch.sigmoid
         elif softmax:
@@ -63,7 +35,7 @@ class DiceWithLogitsLoss(nn.Module):
 
     def forward(self, y_pred: torch.Tensor, y_true: torch.Tensor) -> torch.Tensor:
         y_pred = self.act(y_pred)
-        return dice_loss(y_pred, y_true, self.squared_pred, self.smooth_nr, self.smooth_dr)
+        return dice_loss(y_pred, y_true, self.squared_pred, self.smooth)
 
 
 class DiceBCEWithLogitsLoss(nn.Module):
@@ -89,19 +61,17 @@ def dice_loss(
     y_pred: torch.Tensor,
     y_true: torch.Tensor,
     squared_pred: bool = True,
-    smooth_nr: float = 1,
-    smooth_dr: float = 1,
+    smooth: float = 1,
 ) -> torch.Tensor:
     # flatten
     y_pred = y_pred.flatten()
     y_true = y_true.flatten()
-
-    num = 2 * (y_pred * y_true).sum() + smooth_nr
+    num = 2 * (y_pred * y_true).sum() + smooth
 
     if squared_pred:
-        denom = (y_pred**2).sum() + (y_true**2).sum() + smooth_dr
+        denom = (y_pred**2).sum() + (y_true**2).sum() + smooth
     else:
-        denom = y_pred.sum() + y_true.sum() + smooth_dr
+        denom = y_pred.sum() + y_true.sum() + smooth
 
     return 1 - num / denom
 
@@ -115,17 +85,15 @@ class _LossCriterion(Enum):  # noqa: F811
     DiceBCE = DiceBCEWithLogitsLoss
     BCE = nn.BCEWithLogitsLoss
     MSE = MSEWithLogitsLoss
-    VAELoss = VAELoss
 
 
-class LossCriterion(str, Enum):
+class LossCriterion(str, Enum):  # noqa: F811
     """Supported loss functions."""
 
     Dice = _LossCriterion.Dice.name
     DiceBCE = _LossCriterion.DiceBCE.name
     BCE = _LossCriterion.BCE.name
     MSE = _LossCriterion.MSE.name
-    VAELoss = _LossCriterion.VAELoss.name
 
 
 class _Optimizer(Enum):

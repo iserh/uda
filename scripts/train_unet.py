@@ -57,8 +57,8 @@ def run(dataset: UDADataset, hparams: HParams, model_config: UNetConfig, use_wan
             handler=segmentation_table_plot,
             evaluator=trainer.val_evaluator,
             dim=model.config.dim,
-            imsize=dataset.imsize,
-            patch_size=dataset.patch_size,
+            dataset=dataset,
+            name="validation",
         )
         # table evaluation functions needs predictions from validation set
         eos = EpochOutputStore(
@@ -86,7 +86,7 @@ if __name__ == "__main__":
     # load configuration
     hparams = HParams.from_file(args.config / "hparams.yaml")
     model_config = UNetConfig.from_file(args.config / "model.yaml")
-    dataset = args.dataset(args.config / "dataset.yaml", root=args.data)
+    dataset: UDADataset = args.dataset(args.config / "dataset.yaml", root=args.data)
 
     if args.wandb:
         import wandb
@@ -116,7 +116,7 @@ if __name__ == "__main__":
             run(dataset, hparams, model_config, use_wandb=True)
 
         if args.evaluate:
-            evaluate_unet(run_cfg, table_plot=True)
+            evaluate_unet(dataset, hparams, run_cfg, splits=["validation", "testing"])
         if args.cross_eval:
             cross_evaluate_unet(run_cfg, table_plot=True)
         if not args.store:

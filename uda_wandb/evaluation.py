@@ -11,7 +11,7 @@ from surface_distance import compute_surface_dice_at_tolerance, compute_surface_
 from tqdm import tqdm
 
 from uda import HParams, pipe, reshape_to_volume, sigmoid_round_output_transform, to_cpu_output_transform
-from uda.datasets import CC359
+from uda.datasets import CC359, UDADataset
 from uda.metrics import dice_score
 from uda.models import VAE, UNet
 from uda.models.modules import center_pad_crop
@@ -118,95 +118,53 @@ def evaluate_vae(run_cfg: RunConfig, table_plot: bool = True, table_size: int = 
         run.summary["validation/surface_dice"] = sdice_mean
 
 
-def evaluate_unet(run_cfg: RunConfig, table_plot: bool = True, table_size: int = 5) -> None:
+def evaluate_unet(
+    dataset: UDADataset,
+    hparams: HParams,
+    run_cfg: RunConfig,
+    splits: list[str] = ["validation"],
+    n_predictions: int = 6,
+) -> None:
     print()
     print(f"Evaluating run {run_cfg.run_id}\n")
 
     with wandb.init(project=run_cfg.project, id=run_cfg.run_id, resume=True) as run:
-
-        with TemporaryDirectory() as tmpdir:
-            cfg_dir = download_config(run_cfg, tmpdir)
-            hparams: HParams = HParams.from_file(cfg_dir / "hparams.yaml")
-            dataset = CC359(cfg_dir / "dataset.yaml")
         with TemporaryDirectory() as tmpdir:
             model_path = download_model(run_cfg, tmpdir)
             model = UNet.from_pretrained(model_path)
 
-        download_dataset(CC359)
-        dataset.setup()
-
-        evaluator = SegEvaluator(model)
-        ProgressBar(desc="Eval", persist=True).attach(evaluator)
-        eos = EpochOutputStore(output_transform=pipe(sigmoid_round_output_transform, to_cpu_output_transform))
-        eos.attach(evaluator, "output")
-
-        evaluator.run(dataset.val_dataloader(hparams.val_batch_size))
-        preds, targets, data = [*zip(*evaluator.state.output)]
-
-        preds = torch.cat(preds).numpy()
-        targets = torch.cat(targets).numpy()
-        data = torch.cat(data).numpy()
-
-        preds = reshape_to_volume(preds, model.config.dim, dataset.imsize, dataset.patch_size)
-        targets = reshape_to_volume(targets, model.config.dim, dataset.imsize, dataset.patch_size)
-        data = reshape_to_volume(data, model.config.dim, dataset.imsize, dataset.patch_size)
-
-        class_labels = {1: "Skull"}
-        slice_index = dataset.imsize[0] // 2
-
-        table = wandb.Table(columns=["ID", "Dim", "Criterion", "Dice", "Surface Dice", "Image"])
-        all_dice, all_sdice = [], []
-
-        for i, (y_pred, y_true, img, spacing_mm) in tqdm(
-            enumerate(zip(preds, targets, data, dataset.spacings_mm)),
-            total=len(preds),
-            desc="Computing Scores",
-        ):
-            all_dice.append(dice_score(y_pred, y_true))
-            all_sdice.append(
-                compute_surface_dice_at_tolerance(
-                    compute_surface_distances(y_true.astype(bool), y_pred.astype(bool), spacing_mm),
-                    tolerance_mm=hparams.sf_dice_tolerance,
-                )
-            )
-
-            if table_plot and i < table_size:
-                # the raw background image as a numpy array
-                img = (img[slice_index] * 255).astype(np.uint8)
-                y_pred = y_pred[slice_index].astype(np.uint8)
-                y_true = y_true[slice_index].astype(np.uint8)
-
-                wandb_img = wandb.Image(
-                    img,
-                    masks={
-                        "prediction": {"mask_data": y_pred, "class_labels": class_labels},
-                        "ground truth": {"mask_data": y_true, "class_labels": class_labels},
-                    },
-                )
-
-                table.add_data(
-                    i,
-                    str(run.config.model["dim"]),
-                    run.config.hparams["criterion"],
-                    all_dice[-1],
-                    all_sdice[-1],
-                    wandb_img,
-                )
-
-        dice_mean = np.stack(all_dice).mean()
-        sdice_mean = np.array(all_sdice).mean()
-
-        if table_plot:
+        for split in splits:
             try:
-                old_artifact = run.use_artifact(f"run-{run.id}-validation_results:latest")
-                old_artifact.delete(delete_aliases=True)
-            except Exception:
-                pass
+                dataloader, spacings = dataset.get_split(split)
+            except NotImplementedError:
+                print(f"Skipping split '{split}', since it is not available in dataset {dataset.name}.")
+                return
+            else:
+                print(f"Setup of split '{split}' successful.")
 
-            run.log({"validation_results": table})
+            evaluator = SegEvaluator(model)
+            ProgressBar(desc=f"Eval({split})", persist=True).attach(evaluator)
+            eos = EpochOutputStore(output_transform=pipe(sigmoid_round_output_transform, to_cpu_output_transform))
+            eos.attach(evaluator, "output")
 
-        run.summary["validation/dice"] = dice_mean
-        run.summary["validation/surface_dice"] = sdice_mean
+            evaluator.run(dataloader)
+
+            preds, targets, _ = segmentation_table_plot(evaluator, model.config.dim, dataset, split, n_predictions)
+
+            all_dice, all_sdice = [], []
+            for y_pred, y_true, spacing_mm in tqdm(
+                zip(preds, targets, spacings), total=len(preds), desc="Computing Scores"
+            ):
+                all_dice.append(dice_score(y_pred, y_true))
+                all_sdice.append(
+                    compute_surface_dice_at_tolerance(
+                        compute_surface_distances(y_true.astype(bool), y_pred.astype(bool), spacing_mm),
+                        tolerance_mm=hparams.sf_dice_tolerance,
+                    )
+                )
+
+            run.summary[f"{split}/dice"] = np.stack(all_dice).mean()
+            run.summary[f"{split}/surface_dice"] = np.array(all_sdice).mean()
 
 
 def cross_evaluate_unet(run_cfg: RunConfig, table_plot: bool = True, table_size: int = 5) -> None:
@@ -378,38 +336,25 @@ def vae_table_plot(
 def segmentation_table_plot(
     evaluator: VaeEvaluator,
     dim: int,
-    imsize: tuple[int, int, int],
-    patch_size: tuple[int, int, int],
-    table_size: int = 5,
-) -> None:
+    dataset: UDADataset,
+    name: str,
+    n_predictions: int = 6,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     print()
     print("Creating Segmentation prediction table")
     preds, targets, data = [*zip(*evaluator.state.output)]
 
-    preds = torch.cat(preds).numpy()
-    targets = torch.cat(targets).numpy()
+    preds = torch.cat(preds).argmax(1).numpy()
+    targets = torch.cat(targets).argmax(1).numpy()
     data = torch.cat(data).numpy()
 
-    preds = reshape_to_volume(preds, dim, imsize, patch_size)
-    targets = reshape_to_volume(targets, dim, imsize, patch_size)
-    data = reshape_to_volume(data, dim, imsize, patch_size)
+    preds = reshape_to_volume(preds, dim, dataset.imsize, dataset.patch_size)
+    targets = reshape_to_volume(targets, dim, dataset.imsize, dataset.patch_size)
+    data = reshape_to_volume(data, dim, dataset.imsize, dataset.patch_size)
 
-    class_labels = {1: "Foreground"}
-    slice_index = imsize[0] // 2
+    slice_index = dataset.imsize[0] // 2
 
-    table = wandb.Table(
-        columns=[
-            "ID",
-            "Dim",
-            "Criterion",
-            "Dice",
-            "Surface Dice",
-            "Image",
-        ]
-    )
-
-    for i in range(min(table_size, preds.shape[0])):
-        dice = dice_score(preds[i], targets[i])
+    for i in range(min(n_predictions, preds.shape[0])):
         # the raw background image as a numpy array
         img = (data[i][slice_index] * 255).astype(np.uint8)
         y_pred = preds[i][slice_index].astype(np.uint8)
@@ -418,24 +363,10 @@ def segmentation_table_plot(
         wandb_img = wandb.Image(
             img,
             masks={
-                "prediction": {"mask_data": y_pred, "class_labels": class_labels},
-                "ground truth": {"mask_data": y_true, "class_labels": class_labels},
+                "prediction": {"mask_data": y_pred, "class_labels": dataset.class_labels},
+                "ground truth": {"mask_data": y_true, "class_labels": dataset.class_labels},
             },
         )
+        wandb.log({f"{name}/predictions/{i}": wandb_img}, commit=False)
 
-        table.add_data(
-            i,
-            str(wandb.config.model["dim"]),
-            wandb.config.hparams["criterion"],
-            dice,
-            "-",
-            wandb_img,
-        )
-
-    try:
-        old_artifact = wandb.use_artifact(f"run-{wandb.run.id}-validation_results:latest")
-        old_artifact.delete(delete_aliases=True)
-    except Exception:
-        pass
-
-    wandb.log({"validation_results": table})
+    return preds, targets, data

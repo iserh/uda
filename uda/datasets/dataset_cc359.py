@@ -27,6 +27,7 @@ class CC359(UDADataset):
     """
 
     artifact_name = "iserh/UDA-Datasets/CC359-Skull-stripping:latest"
+    class_labels = {1: "brain"}
 
     def __init__(self, config: Union[CC359Config, str], root: str = "/tmp/data/CC359-Skull-stripping") -> None:
         if not isinstance(config, CC359Config):
@@ -42,14 +43,6 @@ class CC359(UDADataset):
         self.patch_size = config.patch_size
         self.clip_intensities = config.clip_intensities
         self.random_state = config.random_state
-
-    @property
-    def config(self) -> CC359Config:
-        return self._config
-
-    @config.setter
-    def config(self, config: CC359Config) -> None:
-        self._config = config
 
     def setup(self) -> None:
         """Load data from disk, preprocess and split."""

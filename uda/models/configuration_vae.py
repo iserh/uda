@@ -16,4 +16,3 @@ class VAEConfig(Config):
     use_pooling: bool = False
     batch_norm: bool = False
     track_running_stats: bool = True
-    model_name: str = "VAE"

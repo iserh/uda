@@ -67,12 +67,12 @@ class UNetDecoder(nn.Module):
         for block, h in zip(self.upsample_blocks, reversed(hidden_states)):
             if self.concat_hidden:
                 x = block.upsample(x)
-                h = center_pad_crop(h, x.shape[1:])
+                h = center_pad_crop(h, x.shape[2:])
                 x = torch.cat([x, h], dim=1)
                 x = block.conv_block(x)
             else:
                 x = block(x)
-                h = center_pad_crop(h, x.shape[1:])
+                h = center_pad_crop(h, x.shape[2:])
                 x = x + h
 
         return self.out_block(x)

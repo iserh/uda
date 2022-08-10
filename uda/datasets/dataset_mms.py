@@ -5,6 +5,7 @@ from typing import Optional, Union
 import nibabel as nib
 import numpy as np
 import torch
+from ignite.utils import to_onehot
 from nibabel.spatialimages import SpatialImage
 from patchify import patchify
 from sklearn.preprocessing import MinMaxScaler
@@ -26,6 +27,7 @@ class MAndMs(UDADataset):
     """
 
     artifact_name = "iserh/UDA-Datasets/MAndMs:latest"
+    class_labels = {1: "left ventricle (LV)", 2: "myocardium (MYO)", 3: "right ventricle (RV)"}
 
     def __init__(self, config: Union[MAndMsConfig, str], root: str = "/tmp/data/MAndMs") -> None:
         if not isinstance(config, MAndMsConfig):
@@ -43,14 +45,6 @@ class MAndMs(UDADataset):
         self.patch_size = config.patch_size
         self.clip_intensities = config.clip_intensities
         self.limit = config.limit
-
-    @property
-    def config(self) -> MAndMsConfig:
-        return self._config
-
-    @config.setter
-    def config(self, config: MAndMsConfig) -> None:
-        self._config = config
 
     def setup(self) -> None:
         """Load data from disk and preprocess."""
@@ -73,6 +67,16 @@ class MAndMs(UDADataset):
     def test_dataloader(self, batch_size: Optional[int] = None) -> DataLoader:
         batch_size = batch_size or len(self.test_split)
         return DataLoader(self.test_split, batch_size=batch_size, shuffle=False)
+
+    def get_split(self, split: str, batch_size: Optional[int] = None) -> tuple[DataLoader, torch.Tensor]:
+        if split == "training":
+            return self.train_dataloader(batch_size), self.train_spacings
+        elif split == "validation":
+            return self.val_dataloader(batch_size), self.val_spacings
+        elif split == "testing":
+            return self.test_dataloader(batch_size), self.test_spacings
+        else:
+            raise NotImplementedError
 
     def _load_files(self, directory: Path) -> tuple[TensorDataset, torch.Tensor]:
         items = sorted(list(directory.iterdir()))
@@ -119,7 +123,7 @@ class MAndMs(UDADataset):
 
             # from here on -> torch backend
             img = torch.from_numpy(img)
-            mask = torch.from_numpy(mask)
+            mask = torch.from_numpy(mask).long()
             spacing = torch.from_numpy(spacing)
 
             # pad & crop
@@ -150,9 +154,12 @@ class MAndMs(UDADataset):
         if self.flatten:
             # flatten 3d volumes to 2d images
             data = data.reshape(-1, *data.shape[-2:]).unsqueeze(1)
-            targets = targets.reshape(-1, *targets.shape[-2:]).unsqueeze(1)
+            targets = targets.reshape(-1, *targets.shape[-2:])
         else:
             data = data.reshape(-1, *data.shape[-3:]).unsqueeze(1)
             targets = targets.reshape(-1, *targets.shape[-3:]).unsqueeze(1)
+
+        # encode targets as onehot
+        targets = to_onehot(targets, num_classes=4)  # [:, 1:, ...]
 
         return TensorDataset(data, targets), spacings

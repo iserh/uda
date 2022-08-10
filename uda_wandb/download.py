@@ -26,12 +26,12 @@ def _move_all_files(src: str, dest: str) -> None:
         shutil.move(file_path, dest)
 
 
-def download_dataset(dataset: type[UDADataset], root: str = "/tmp/data") -> Path:
+def download_dataset(dataset: Union[type[UDADataset], UDADataset], root: str = "/tmp/data") -> Path:
     root = Path(root)
 
     api = wandb.Api()
     artifact = api.artifact(dataset.artifact_name)
-    path = artifact.download(root=root / dataset.__name__)
+    path = artifact.download(root=root / dataset.name)
     return path
 
 
@@ -146,15 +146,15 @@ if __name__ == "__main__":
     from argparse import ArgumentParser
 
     parser = ArgumentParser()
-    parser.add_argument("project", type=str)
-    parser.add_argument("run_id", type=str)
+    parser.add_argument("-p", "--project", type=str, default="")
+    parser.add_argument("-r", "--run", type=str, default="")
     parser.add_argument("--dataset", type=DatasetType, default="CC359")
     parser.add_argument("--object", type=str, default="config")
     parser.add_argument("--path", type=Path, default="config")
     parser.add_argument("-o", "--old", action="store_true")
     args = parser.parse_args()
 
-    run_cfg = RunConfig(args.run_id, args.project)
+    run_cfg = RunConfig(args.run, args.project)
 
     if args.object == "config":
         download_config(run_cfg, path=args.path, old=args.old)

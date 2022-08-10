@@ -34,10 +34,10 @@ class JointEvaluator(BaseEvaluator):
         y_vae = self.vae_cropping(y_pred)
         y_rec, _, _ = self.vae(y_vae)
 
-        y_true = center_pad_crop(y_true, y_pred.shape[1:])
-        y_vae = center_pad_crop(y_vae, y_rec.shape[1:])
+        y_true = center_pad_crop(y_true, y_pred.shape[2:])
+        y_vae = center_pad_crop(y_vae, y_rec.shape[2:])
 
-        x = center_pad_crop(x, y_pred.shape[1:])
+        x = center_pad_crop(x, y_pred.shape[2:])
 
         return y_pred, y_true, y_vae, y_rec, x
 
@@ -126,8 +126,8 @@ class JointTrainer(BaseEvaluator):
             y_vae = self.vae_cropping(y_pred)
             y_rec, _, _ = self.vae(y_vae)
 
-        y_true = center_pad_crop(y_true, y_pred.shape[1:])
-        y_vae = center_pad_crop(y_vae, y_rec.shape[1:])
+        y_true = center_pad_crop(y_true, y_pred.shape[2:])
+        y_vae = center_pad_crop(y_vae, y_rec.shape[2:])
 
         pseudo_loss = self.loss_fn(y_pred, y_true)
         rec_loss = self.loss_fn(y_vae, y_rec) * self.lambd

@@ -28,8 +28,8 @@ class SegEvaluator(BaseEvaluator):
         y_true = convert_tensor(batch[1], idist.device())
         y_pred = self.model(x)
 
-        y_true = center_pad_crop(y_true, y_pred.shape[1:])
-        x = center_pad_crop(x, y_pred.shape[1:])
+        y_true = center_pad_crop(y_true, y_pred.shape[2:])
+        x = center_pad_crop(x, y_pred.shape[2:])
 
         return y_pred, y_true, x
 
@@ -99,7 +99,7 @@ class SegTrainer(BaseEvaluator):
         y_true = convert_tensor(batch[1], idist.device())
         y_pred = self.model(x)
 
-        y_true = center_pad_crop(y_true, y_pred.shape[1:])
+        y_true = center_pad_crop(y_true, y_pred.shape[2:])
 
         loss = self.loss_fn(y_pred, y_true)
         loss.backward()

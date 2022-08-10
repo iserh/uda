@@ -72,6 +72,7 @@ def run(teacher: UNet, vae: VAE, dataset: UDADataset, hparams: HParams, use_wand
             handler=segmentation_table_plot,
             evaluator=trainer.val_evaluator,
             dim=model.config.dim,
+            class_labels=dataset.class_labels,
             imsize=dataset.imsize,
             patch_size=dataset.patch_size,
         )

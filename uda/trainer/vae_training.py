@@ -29,7 +29,7 @@ class VaeEvaluator(BaseEvaluator):
             x = convert_tensor(batch[1], idist.device())
             x_rec, mean, v_log = self.model(x)
 
-        x = center_pad_crop(x, x_rec.shape[1:])
+        x = center_pad_crop(x, x_rec.shape[2:])
 
         return x_rec, x, mean, v_log
 
@@ -92,7 +92,7 @@ class VaeTrainer(BaseEvaluator):
         x = convert_tensor(batch[1], idist.device())
         x_rec, mean, v_log = self.model(x)
 
-        x = center_pad_crop(x, x_rec.shape[1:])
+        x = center_pad_crop(x, x_rec.shape[2:])
 
         rec_l = self.loss_fn(x_rec, x)
         kl_l = kl_loss(mean, v_log) * self.beta
