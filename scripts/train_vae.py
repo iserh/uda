@@ -9,7 +9,7 @@ from ignite.handlers import EpochOutputStore
 from uda import HParams, get_loss_cls, get_optimizer_cls
 from uda.datasets import UDADataset
 from uda.models import VAE, VAEConfig
-from uda.trainer import VaeTrainer, vae_standard_metrics, get_preds_output_transform, pipe, to_cpu_output_transform
+from uda.trainer import VaeTrainer, get_preds_output_transform, pipe, to_cpu_output_transform, vae_standard_metrics
 from uda_wandb import prediction_image_plot
 
 

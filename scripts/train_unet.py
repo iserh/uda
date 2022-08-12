@@ -9,7 +9,13 @@ from ignite.handlers import EpochOutputStore
 from uda import HParams, get_loss_cls, get_optimizer_cls
 from uda.datasets import UDADataset
 from uda.models import UNet, UNetConfig
-from uda.trainer import SegTrainer, segmentation_standard_metrics, get_preds_output_transform, pipe, to_cpu_output_transform
+from uda.trainer import (
+    SegTrainer,
+    get_preds_output_transform,
+    pipe,
+    segmentation_standard_metrics,
+    to_cpu_output_transform,
+)
 from uda_wandb.evaluation import prediction_image_plot
 
 
