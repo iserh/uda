@@ -11,8 +11,7 @@ from sklearn.preprocessing import MinMaxScaler
 from torch.utils.data import ConcatDataset, DataLoader, TensorDataset
 from tqdm import tqdm
 
-from uda.transforms import center_pad
-
+from ..transforms import center_pad
 from .base import UDADataset
 from .configuration_mms import MAndMsConfig
 
@@ -22,17 +21,17 @@ class MAndMs(UDADataset):
 
     Args:
         config (Union[MAndMsConfig, str]): Either path to config file or config object itself.
-        root (str, optional): Path where dataset is located. Defaults to "/tmp/data/MAndMs".
+        root (str, optional): Path where dataset is located. Defaults to "/tmp/data".
     """
 
     artifact_name = "iserh/UDA-Datasets/MAndMs:latest"
     class_labels = {1: "left ventricle (LV)", 2: "myocardium (MYO)", 3: "right ventricle (RV)"}
 
-    def __init__(self, config: Union[MAndMsConfig, str], root: str = "/tmp/data/MAndMs") -> None:
+    def __init__(self, config: Union[MAndMsConfig, str], root: str = "/tmp/data") -> None:
         if not isinstance(config, MAndMsConfig):
             config = MAndMsConfig.from_file(config)
 
-        self.root = Path(root)
+        self.root = Path(root) / self.__class__.__name__
         self.config = config
 
         phases_dict = {"ED": 0, "ES": 1}

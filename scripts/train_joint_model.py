@@ -105,8 +105,8 @@ if __name__ == "__main__":
     args = get_args()
 
     # load configuration
-    hparams = HParams.from_file(args.config / "hparams.yaml")
-    dataset: UDADataset = args.dataset(args.config / "dataset.yaml", root=args.data)
+    hparams = HParams.from_file(args.config_dir / "hparams.yaml")
+    dataset: UDADataset = args.dataset(args.config_dir / "dataset.yaml", root=args.data_root)
 
     if args.wandb:
         import wandb
@@ -121,7 +121,7 @@ if __name__ == "__main__":
             evaluate,
         )
 
-        if args.download:
+        if args.dl_model:
             vae_run = RunConfig.parse_path(args.vae_path)
             teacher_run = RunConfig.parse_path(args.teacher_path)
             vae_path = download_model(vae_run, path="/tmp/models/vae").parent

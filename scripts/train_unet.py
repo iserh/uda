@@ -90,9 +90,9 @@ if __name__ == "__main__":
     args = get_args()
 
     # load configuration
-    hparams = HParams.from_file(args.config / "hparams.yaml")
-    model_config = UNetConfig.from_file(args.config / "model.yaml")
-    dataset: UDADataset = args.dataset(args.config / "dataset.yaml", root=args.data)
+    hparams = HParams.from_file(args.config_dir / "hparams.yaml")
+    model_config = UNetConfig.from_file(args.config_dir / "model.yaml")
+    dataset: UDADataset = args.dataset(args.config_dir / "dataset.yaml", root=args.data_root)
 
     if args.wandb:
         import wandb

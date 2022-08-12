@@ -5,7 +5,7 @@ from typing import Any, Optional
 import torch
 from torch.utils.data import DataLoader
 
-from uda.config import Config
+from ..config import Config
 
 
 class classproperty(object):

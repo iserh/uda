@@ -4,7 +4,7 @@ from setuptools import setup, find_packages
 with open("requirements.txt") as f:
     deps = f.read().split("\n")
 
-with open("dev-requirements.txt") as f:
+with open("requirements-dev.txt") as f:
     dev_deps = f.read().split("\n")
 
 extras = {

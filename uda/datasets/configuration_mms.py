@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import ClassVar, Optional
 
-from uda.config import Config
+from ..config import Config
 
 
 @dataclass

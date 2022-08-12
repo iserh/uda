@@ -12,8 +12,7 @@ from sklearn.preprocessing import MinMaxScaler
 from torch.utils.data import DataLoader, TensorDataset
 from tqdm import tqdm
 
-from uda.transforms import center_pad
-
+from ..transforms import center_pad
 from .base import UDADataset
 from .configuration_cc359 import CC359Config
 
@@ -23,17 +22,17 @@ class CC359(UDADataset):
 
     Args:
         config (Union[CC359Config, str]): Either path to config file or config object itself.
-        root (str, optional): Path where dataset is located. Defaults to "/tmp/data/CC359".
+        root (str, optional): Path where dataset is located. Defaults to "/tmp/data".
     """
 
     artifact_name = "iserh/UDA-Datasets/CC359-Skull-stripping:latest"
     class_labels = {1: "brain"}
 
-    def __init__(self, config: Union[CC359Config, str], root: str = "/tmp/data/CC359") -> None:
+    def __init__(self, config: Union[CC359Config, str], root: str = "/tmp/data") -> None:
         if not isinstance(config, CC359Config):
             config = CC359Config.from_file(config)
 
-        self.root = Path(root)
+        self.root = Path(root) / self.__class__.__name__
         self.config = config
         self.vendor = config.vendor
         self.fold = config.fold
