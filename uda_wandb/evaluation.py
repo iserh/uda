@@ -43,7 +43,7 @@ def evaluate(
             try:
                 dataloader, spacings = dataset.get_split(split, batch_size=hparams.val_batch_size)
             except NotImplementedError:
-                print(f"Skipping split '{split}', since it is not available in dataset {dataset.name}.")
+                print(f"Skipping split '{split}', since it is not available in dataset {dataset.__class__.__name__}.")
                 return
             else:
                 print(f"Setup of split '{split}' successful.")

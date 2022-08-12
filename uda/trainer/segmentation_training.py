@@ -10,9 +10,9 @@ from ignite.metrics import ConfusionMatrix, DiceCoefficient, Loss, Metric
 from ignite.utils import convert_tensor
 from torch.utils.data import DataLoader
 
-from uda.models import center_pad_crop
-from uda.trainer.base import BaseEvaluator, dice_score_fn
-from uda.utils import one_hot_output_transform, pipe
+from ..transforms import center_pad
+from .base import BaseEvaluator, dice_score_fn
+from .output_transforms import one_hot_output_transform, pipe
 
 
 class SegEvaluator(BaseEvaluator):
@@ -28,8 +28,8 @@ class SegEvaluator(BaseEvaluator):
         y_true = convert_tensor(batch[1], idist.device())
         y_pred = self.model(x)
 
-        y_true = center_pad_crop(y_true, y_pred.shape[2:])
-        x = center_pad_crop(x, y_pred.shape[2:])
+        y_true = center_pad(y_true, y_pred.shape[2:])
+        x = center_pad(x, y_pred.shape[2:])
 
         return y_pred, y_true, x
 
@@ -99,7 +99,7 @@ class SegTrainer(BaseEvaluator):
         y_true = convert_tensor(batch[1], idist.device())
         y_pred = self.model(x)
 
-        y_true = center_pad_crop(y_true, y_pred.shape[2:])
+        y_true = center_pad(y_true, y_pred.shape[2:])
 
         loss = self.loss_fn(y_pred, y_true)
         loss.backward()

@@ -7,11 +7,11 @@ from ignite.engine import Events
 from ignite.handlers import EpochOutputStore
 from torch.optim.lr_scheduler import LinearLR
 
-from uda import HParams, get_criterion, get_preds_output_transform, optimizer_cls, pipe, to_cpu_output_transform
+from uda import HParams, get_loss_cls, get_optimizer_cls
 from uda.datasets import UDADataset
 from uda.datasets.dataset_teacher import TeacherData
 from uda.models import VAE, UNet
-from uda.trainer import JointTrainer, joint_standard_metrics
+from uda.trainer import JointTrainer, get_preds_output_transform, joint_standard_metrics, pipe, to_cpu_output_transform
 from uda_wandb import prediction_image_plot
 
 
@@ -29,9 +29,9 @@ def run(teacher: UNet, vae: VAE, dataset: UDADataset, hparams: HParams, use_wand
     model = UNet(teacher.config)
     model.load_state_dict(teacher.state_dict())  # copy weights
 
-    optim = optimizer_cls(hparams.optimizer)(model.parameters(), lr=hparams.learning_rate)
+    optim = get_optimizer_cls(hparams.optimizer)(model.parameters(), lr=hparams.learning_rate)
     schedule = LinearLR(optim, 0.01, 1.0, len(train_loader))
-    loss_fn = get_criterion(hparams.criterion)(**hparams.loss_kwargs)
+    loss_fn = get_loss_cls(hparams.criterion)(**hparams.loss_kwargs)
 
     trainer = JointTrainer(
         model=model,

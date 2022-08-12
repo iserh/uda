@@ -1,12 +1,15 @@
 """U-Net configuration."""
 from dataclasses import dataclass
+from typing import ClassVar
 
-from uda.config import Config
+from ..config import Config
 
 
 @dataclass
 class UNetConfig(Config):
     """Configuration for U-Net."""
+
+    name: ClassVar[str] = "UNet"
 
     out_channels: int
     encoder_blocks: list[list[int]]

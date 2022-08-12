@@ -28,10 +28,12 @@ def _move_all_files(src: str, dest: str) -> None:
 
 def download_dataset(dataset: Union[type[UDADataset], UDADataset], root: str = "/tmp/data") -> Path:
     root = Path(root)
+    if isinstance(dataset, UDADataset):
+        dataset = dataset.__class__
 
     api = wandb.Api()
     artifact = api.artifact(dataset.artifact_name)
-    path = artifact.download(root=root / dataset.name)
+    path = artifact.download(root=root / dataset.__name__)
     return path
 
 

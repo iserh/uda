@@ -10,17 +10,18 @@ from ignite.metrics import ConfusionMatrix, DiceCoefficient, Loss, Metric
 from ignite.utils import convert_tensor
 from torch.utils.data import DataLoader
 
-from uda.models import VAE, CenterPadCrop, UNet, center_pad_crop
-from uda.trainer.base import BaseEvaluator, dice_score_fn
-from uda.utils import one_hot_output_transform, pipe
+from ..models import VAE, UNet
+from ..transforms import CenterPad, center_pad
+from .base import BaseEvaluator, dice_score_fn
+from .output_transforms import one_hot_output_transform, pipe
 
 
 class JointEvaluator(BaseEvaluator):
-    def __init__(self, model: nn.Module, vae: nn.Module) -> None:
+    def __init__(self, model: nn.Module, vae: nn.Module, vae_input_size: tuple[int, ...]) -> None:
         super(JointEvaluator, self).__init__()
         self.model = model.to(idist.device())
         self.vae = vae.to(idist.device())
-        self.vae_cropping = CenterPadCrop(*vae.config.input_size)
+        self.vae_cropping = CenterPad(*vae_input_size)
 
     @torch.no_grad()
     def step(self, batch: tuple[torch.Tensor, ...]) -> tuple[torch.Tensor, ...]:
@@ -34,10 +35,10 @@ class JointEvaluator(BaseEvaluator):
         y_vae = self.vae_cropping(y_pred)
         y_rec, _, _ = self.vae(y_vae)
 
-        y_true = center_pad_crop(y_true, y_pred.shape[2:])
-        y_vae = center_pad_crop(y_vae, y_rec.shape[2:])
+        y_true = center_pad(y_true, y_pred.shape[2:])
+        y_vae = center_pad(y_vae, y_rec.shape[2:])
 
-        x = center_pad_crop(x, y_pred.shape[2:])
+        x = center_pad(x, y_pred.shape[2:])
 
         return y_pred, y_true, y_vae, y_rec, x
 
@@ -62,7 +63,7 @@ class JointTrainer(BaseEvaluator):
         super(JointTrainer, self).__init__()
         self.model = model.to(idist.device())
         self.vae = vae.to(idist.device())
-        self.vae_cropping = CenterPadCrop(*vae.config.input_size)
+        self.vae_cropping = CenterPad(*vae.config.input_size)
         self.optim = optim
         self.schedule = schedule
         self.loss_fn = loss_fn
@@ -126,8 +127,8 @@ class JointTrainer(BaseEvaluator):
             y_vae = self.vae_cropping(y_pred)
             y_rec, _, _ = self.vae(y_vae)
 
-        y_true = center_pad_crop(y_true, y_pred.shape[2:])
-        y_vae = center_pad_crop(y_vae, y_rec.shape[2:])
+        y_true = center_pad(y_true, y_pred.shape[2:])
+        y_vae = center_pad(y_vae, y_rec.shape[2:])
 
         pseudo_loss = self.loss_fn(y_pred, y_true)
         rec_loss = self.loss_fn(y_vae, y_rec) * self.lambd
@@ -140,13 +141,13 @@ class JointTrainer(BaseEvaluator):
         return pseudo_loss, rec_loss
 
 
-def joint_standard_metrics(loss_fn: nn.Module, lambd: float) -> dict[str, Metric]:
+def joint_standard_metrics(loss_fn: nn.Module, num_classes: int, lambd: float) -> dict[str, Metric]:
     return {
         "pseudo_loss": Loss(loss_fn, output_transform=lambda o: o[:2]),
         "rec_loss": Loss(lambda *args: loss_fn(*args) * lambd, output_transform=lambda o: o[2:4]),
         "dice": DiceCoefficient(
             ConfusionMatrix(
-                num_classes=2,
+                num_classes=num_classes,
                 output_transform=pipe(lambda o: o[:2], one_hot_output_transform),
             ),
             ignore_index=0,

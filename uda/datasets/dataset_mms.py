@@ -5,14 +5,13 @@ from typing import Optional, Union
 import nibabel as nib
 import numpy as np
 import torch
-from ignite.utils import to_onehot
 from nibabel.spatialimages import SpatialImage
-from patchify import patchify
+from pypatchify.pt import pt
 from sklearn.preprocessing import MinMaxScaler
 from torch.utils.data import ConcatDataset, DataLoader, TensorDataset
 from tqdm import tqdm
 
-from uda.models.modules import center_pad_crop
+from uda.transforms import center_pad
 
 from .base import UDADataset
 from .configuration_mms import MAndMsConfig
@@ -127,8 +126,8 @@ class MAndMs(UDADataset):
             spacing = torch.from_numpy(spacing)
 
             # pad & crop
-            img = center_pad_crop(img, self.imsize, self.offset)
-            mask = center_pad_crop(mask, self.imsize, self.offset)
+            img = center_pad(img, self.imsize, self.offset)
+            mask = center_pad(mask, self.imsize, self.offset)
 
             images.extend(img)
             masks.extend(mask)
@@ -139,27 +138,14 @@ class MAndMs(UDADataset):
         spacings = torch.stack(spacings)
 
         if self.patch_size is not None:
-            n = len(data)
             # sadly patchify only works with numpy arrays
-            data = patchify(data.reshape(-1, *data.shape[-2:]).numpy(), self.patch_size, self.patch_size).reshape(
-                n, -1, *self.patch_size
-            )
-            data = torch.from_numpy(data)
-            targets = patchify(
-                targets.reshape(-1, *targets.shape[-2:]).numpy(), self.patch_size, self.patch_size
-            ).reshape(n, -1, *self.patch_size)
-            targets = torch.from_numpy(targets)
+            data = pt.patchify_to_batches(data, self.patch_size, batch_dim=0)
+            targets = pt.patchify_to_batches(targets, self.patch_size, batch_dim=0)
 
         # optional flatten & add channel dim
         if self.flatten:
-            # flatten 3d volumes to 2d images
-            data = data.reshape(-1, *data.shape[-2:]).unsqueeze(1)
-            targets = targets.reshape(-1, *targets.shape[-2:])
-        else:
-            data = data.reshape(-1, *data.shape[-3:]).unsqueeze(1)
-            targets = targets.reshape(-1, *targets.shape[-3:]).unsqueeze(1)
-
-        # encode targets as onehot
-        targets = to_onehot(targets, num_classes=4).float()  # [:, 1:, ...]
+            # transpose z_dim next to batch_dim
+            data = pt.collapse_dims(data, dims=(0, -3))
+            targets = pt.collapse_dims(targets, dims=(0, -3))
 
         return TensorDataset(data, targets), spacings

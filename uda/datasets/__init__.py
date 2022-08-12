@@ -8,9 +8,9 @@ from .dataset_teacher import TeacherData  # noqa: F401
 
 class DatasetType:
     def __new__(cls, name: str) -> None:
-        if name == CC359.name:
+        if name == CC359.__name__:
             return CC359
-        elif name == MAndMs.name:
+        elif name == MAndMs.__name__:
             return MAndMs
         else:
             raise ValueError(f"Dataset '{name}' does not exist.")

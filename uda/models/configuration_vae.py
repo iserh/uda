@@ -1,12 +1,15 @@
 """U-Net configuration."""
 from dataclasses import dataclass
+from typing import ClassVar
 
-from uda.config import Config
+from ..config import Config
 
 
 @dataclass
 class VAEConfig(Config):
     """Configuration for Variational Autoencoder."""
+
+    name: ClassVar[str] = "VAE"
 
     input_size: tuple[int, ...]
     encoder_blocks: tuple[tuple[int, ...], ...]

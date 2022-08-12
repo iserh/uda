@@ -10,10 +10,10 @@ from ignite.metrics import ConfusionMatrix, DiceCoefficient, Loss, Metric
 from ignite.utils import convert_tensor
 from torch.utils.data import DataLoader
 
-from uda.losses import kl_loss
-from uda.models import center_pad_crop
-from uda.trainer.base import BaseEvaluator, dice_score_fn
-from uda.utils import one_hot_output_transform, pipe
+from ..losses import kl_std_div
+from ..transforms import center_pad
+from .base import BaseEvaluator, dice_score_fn
+from .output_transforms import one_hot_output_transform, pipe
 
 
 class VaeEvaluator(BaseEvaluator):
@@ -30,10 +30,10 @@ class VaeEvaluator(BaseEvaluator):
             y = convert_tensor(batch[1], idist.device())
             y_rec, mean, v_log = self.model(y)
 
-        x = center_pad_crop(x, y_rec.shape[2:])
-        y = center_pad_crop(y, y_rec.shape[2:])
+        x = center_pad(x, y_rec.shape[2:])
+        y = center_pad(y, y_rec.shape[2:])
 
-        return y_rec, y, x, mean, v_log
+        return y_rec, y, mean, v_log, x
 
 
 class VaeTrainer(BaseEvaluator):
@@ -94,10 +94,10 @@ class VaeTrainer(BaseEvaluator):
         x = convert_tensor(batch[1], idist.device())
         x_rec, mean, v_log = self.model(x)
 
-        x = center_pad_crop(x, x_rec.shape[2:])
+        x = center_pad(x, x_rec.shape[2:])
 
         rec_l = self.loss_fn(x_rec, x)
-        kl_l = kl_loss(mean, v_log) * self.beta
+        kl_l = kl_std_div(mean, v_log) * self.beta
         loss = kl_l + rec_l
 
         loss.backward()
@@ -109,7 +109,7 @@ class VaeTrainer(BaseEvaluator):
 def vae_standard_metrics(loss_fn: nn.Module, num_classes: int, beta: float) -> dict[str, Metric]:
     return {
         "rec_loss": Loss(loss_fn, output_transform=lambda o: o[:2]),
-        "kl_loss": Loss(lambda *args: kl_loss(*args) * beta, output_transform=lambda o: o[3:]),
+        "kl_loss": Loss(lambda *args: kl_std_div(*args) * beta, output_transform=lambda o: o[2:4]),
         "dice": DiceCoefficient(
             ConfusionMatrix(
                 num_classes=num_classes,

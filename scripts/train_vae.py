@@ -6,11 +6,11 @@ from ignite.contrib.handlers.wandb_logger import WandBLogger
 from ignite.engine import Events
 from ignite.handlers import EpochOutputStore
 
-from uda import HParams, get_criterion, get_preds_output_transform, optimizer_cls, pipe, to_cpu_output_transform
+from uda import HParams, get_loss_cls, get_optimizer_cls
 from uda.datasets import UDADataset
 from uda.models import VAE, VAEConfig
-from uda.trainer import VaeTrainer, vae_standard_metrics
-from uda_wandb import vae_table_plot
+from uda.trainer import VaeTrainer, vae_standard_metrics, get_preds_output_transform, pipe, to_cpu_output_transform
+from uda_wandb import prediction_image_plot
 
 
 def run(dataset: UDADataset, hparams: HParams, model_config: VAEConfig, use_wandb: bool = False) -> None:
@@ -20,8 +20,8 @@ def run(dataset: UDADataset, hparams: HParams, model_config: VAEConfig, use_wand
     dataset.setup()
 
     model = VAE(model_config)
-    optim = optimizer_cls(hparams.optimizer)(model.parameters(), lr=hparams.learning_rate)
-    loss_fn = get_criterion(hparams.criterion)(**hparams.loss_kwargs)
+    optim = get_optimizer_cls(hparams.optimizer)(model.parameters(), lr=hparams.learning_rate)
+    loss_fn = get_loss_cls(hparams.criterion)(**hparams.loss_kwargs)
 
     trainer = VaeTrainer(
         model=model,
@@ -62,7 +62,7 @@ def run(dataset: UDADataset, hparams: HParams, model_config: VAEConfig, use_wand
         # wandb table evaluation
         trainer.add_event_handler(
             event_name=Events.EPOCH_COMPLETED,
-            handler=vae_table_plot,
+            handler=prediction_image_plot,
             evaluator=trainer.val_evaluator,
             data=next(iter(dataset.val_dataloader())),
             dim=model.config.dim,
@@ -71,7 +71,7 @@ def run(dataset: UDADataset, hparams: HParams, model_config: VAEConfig, use_wand
         )
         # table evaluation functions needs predictions from validation set
         eos = EpochOutputStore(
-            output_transform=pipe(lambda o: o[:3], get_preds_output_transform, to_cpu_output_transform)
+            output_transform=pipe(lambda o: (*o[:2], o[4]), get_preds_output_transform, to_cpu_output_transform)
         )
         eos.attach(trainer.val_evaluator, "output")
 

@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Optional
+from typing import ClassVar, Optional
 
 from uda.config import Config
 
@@ -10,6 +10,8 @@ class MAndMsConfig(Config):
 
     Args:
     """
+
+    name: ClassVar[str] = "CC359"
 
     phases: tuple[str] = ("ED", "ES")
     unlabeled: bool = False

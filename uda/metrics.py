@@ -1,112 +1,88 @@
-from typing import Optional, Union
-
-import numpy as np
 import torch
-from ignite.metrics import EpochMetric
+from ignite.utils import to_onehot
 from surface_distance import compute_surface_dice_at_tolerance, compute_surface_distances
 from tqdm import tqdm
 
-from .utils import flatten_output_transform, get_preds_output_transform, pipe, reshape_to_volume
 
+def dice_score(y_pred: torch.Tensor, y_true: torch.Tensor, eps: float = 1e-5) -> torch.Tensor:
+    """Computes the class-wise dice coefficient.
 
-class DiceScore(EpochMetric):
-    def __init__(
-        self,
-        dim: int,
-        imsize: tuple[int, int, int],
-        patch_size: Optional[tuple[int, int, int]] = None,
-        reduce_mean: bool = True,
-        check_compute_fn: bool = False,
-    ) -> None:
-        output_transform = pipe(get_preds_output_transform, flatten_output_transform)
-        super(DiceScore, self).__init__(self.compute_fn, output_transform, check_compute_fn)
-        self.dim = dim
-        self.imsize = imsize
-        self.patch_size = patch_size
-        self.reduce_mean = reduce_mean
+    Args:
+        y_pred (torch.Tensor): Expected shape :math:`(N, C, ...)`, where :math:`N` is the batch size and
+            :math:`C` is the number of classes. :math:`C=1` is interpreted as the foreground
+            class of a binary segmentation.
+        y_true (torch.Tensor): If containing class indices, shape :math:`(N)`.
+            If containing class probabilities, same shape as the input and each value should be
+            between :math:`[0, 1]`.
+        eps (float, optional): Smoothing to avoid NaN's. Defaults to :math:`1e-15`.
 
-    def compute_fn(self, y_pred: torch.Tensor, y_true: torch.Tensor) -> torch.Tensor:
-        y_pred = reshape_to_volume(y_pred, self.dim, self.imsize, self.patch_size)
-        y_true = reshape_to_volume(y_true, self.dim, self.imsize, self.patch_size)
+    Returns:
+        torch.Tensor: Shape :math:`(C)`
+    """
+    # check targets given as indices
+    if len(y_true.shape) == len(y_pred.shape) - 1:
+        # convert to onehot
+        y_true = to_onehot(y_true, y_pred.shape[1])
 
-        return dice_score(y_pred, y_true, axis=1 if self.reduce_mean else 0)
+    assert y_pred.shape == y_true.shape
 
-
-class SurfaceDice(EpochMetric):
-    def __init__(
-        self,
-        spacings_mm: torch.Tensor,
-        tolerance_mm: float,
-        dim: int,
-        imsize: tuple[int, int, int],
-        patch_size: Optional[tuple[int, int, int]] = None,
-        reduce_mean: bool = True,
-        prog_bar: bool = True,
-        check_compute_fn: bool = False,
-    ) -> None:
-        output_transform = pipe(get_preds_output_transform, flatten_output_transform)
-        super(SurfaceDice, self).__init__(self.compute_fn, output_transform, check_compute_fn)
-        self.spacings_mm = spacings_mm
-        self.tolerance_mm = tolerance_mm
-        self.dim = dim
-        self.imsize = imsize
-        self.patch_size = patch_size
-        self.reduce_mean = reduce_mean
-        self.prog_bar = prog_bar
-
-    def compute_fn(self, y_pred: torch.Tensor, y_true: torch.Tensor) -> torch.Tensor:
-        y_pred = reshape_to_volume(y_pred, self.dim, self.imsize, self.patch_size)
-        y_true = reshape_to_volume(y_true, self.dim, self.imsize, self.patch_size)
-
-        sf_dice_vals = surface_dice(y_pred, y_true, self.spacings_mm, self.tolerance_mm, self.prog_bar)
-
-        return sf_dice_vals.mean() if self.reduce_mean else sf_dice_vals
-
-
-def dice_score(
-    y_pred: Union[np.ndarray, torch.Tensor], y_true: Union[np.ndarray, torch.Tensor], axis: int = 0
-) -> Union[np.ndarray, torch.Tensor]:
     # flatten
-    y_pred = y_pred.reshape(*y_pred.shape[:axis], -1)
-    y_true = y_true.reshape(*y_true.shape[:axis], -1)
+    y_pred = y_pred.transpose(1, 0).flatten(1)
+    y_true = y_true.transpose(1, 0).flatten(1)
 
-    num = 2 * (y_pred * y_true).sum(axis)
-    denom = y_pred.sum(axis) + y_true.sum(axis)
+    num = 2 * (y_pred * y_true).sum(1)
+    denom = y_pred.sum(1) + y_true.sum(1)
 
-    return num / denom
+    return (num + eps) / (denom + eps)
 
 
 def surface_dice(
-    preds: Union[np.ndarray, torch.Tensor],
-    targets: Union[np.ndarray, torch.Tensor],
-    spacings_mm: Union[np.ndarray, torch.Tensor],
+    y_pred: torch.Tensor,
+    y_true: torch.Tensor,
+    spacings_mm: torch.Tensor,
     tolerance_mm: float,
     prog_bar: bool = True,
-) -> Union[np.ndarray, torch.Tensor]:
-    # check if torch.Tensor (surface-distance uses numpy backend)
-    if isinstance(preds, torch.Tensor):
-        preds = preds.numpy()
-        output_type_tensor = True
-    else:
-        output_type_tensor = False
-    if isinstance(preds, torch.Tensor):
-        targets = targets.numpy()
-    if isinstance(preds, torch.Tensor):
-        spacings_mm = spacings_mm.numpy()
+) -> torch.Tensor:
+    """Computes the class-wise surface-dice.
+
+    Args:
+        y_pred (torch.Tensor): Expected shape :math:`(N, C, ...)`, where :math:`N` is the batch size and
+            :math:`C` is the number of classes. :math:`C=1` is interpreted as the foreground
+            class of a binary segmentation.
+        y_true (torch.Tensor): If containing class indices, shape :math:`(N)`.
+            If containing class probabilities, same shape as the input and each value should be
+            between :math:`[0, 1]`.
+        eps (float, optional): Smoothing to avoid NaN's. Defaults to :math:`1e-15`.
+
+    Returns:
+        torch.Tensor: Shape :math:`(C)`
+    """
+    # check targets given as indices
+    if len(y_true.shape) == len(y_pred.shape) - 1:
+        # convert to onehot
+        y_true = to_onehot(y_true, y_pred.shape[1])
+
+    assert y_pred.shape == y_true.shape
+
+    batch_size, num_classes = y_pred.shape[:2]
+    # collect batch & classes in one axis
+    y_pred = y_pred.reshape(-1, *y_pred.shape[2:])
+    y_true = y_true.reshape(-1, *y_true.shape[2:])
+    spacings_mm = spacings_mm.repeat_interleave(num_classes, 0)
 
     iterator = (
-        tqdm(zip(preds, targets, spacings_mm), total=len(preds), desc="Computing surface dice", leave=False)
+        tqdm(zip(y_pred, y_true, spacings_mm), total=len(y_pred), desc="Computing surface dice", leave=False)
         if prog_bar
-        else zip(preds, targets, spacings_mm)
+        else zip(y_pred, y_true, spacings_mm)
     )
 
-    sf_dice_vals = np.array(
+    sf_dice_vals = torch.Tensor(
         [
             compute_surface_dice_at_tolerance(
-                compute_surface_distances(y_true.astype(bool), y_pred_.astype(bool), spacing_mm), tolerance_mm
+                compute_surface_distances(mask_gt.bool().numpy(), mask_pred.bool().numpy(), spacing_mm), tolerance_mm
             )
-            for y_pred_, y_true, spacing_mm in iterator
+            for mask_pred, mask_gt, spacing_mm in iterator
         ]
     )
 
-    return torch.from_numpy(sf_dice_vals) if output_type_tensor else sf_dice_vals
+    return sf_dice_vals.reshape(batch_size, num_classes)

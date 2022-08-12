@@ -1,4 +1,3 @@
-from math import ceil, floor
 from typing import Union
 
 import torch
@@ -133,34 +132,6 @@ class DownsampleBlock(nn.Module):
         x = self.downsampling(x)
         x = self.conv_block(x)
         return x
-
-
-class CenterPadCrop(nn.Module):
-    def __init__(self, *shape: int, mode: str = "constant", value: float = 0) -> None:
-        super().__init__()
-        self.shape = shape
-        self.mode = mode
-        self.value = value
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return center_pad_crop(x, self.shape, self.mode, self.value)
-
-
-def center_pad_crop(
-    x: torch.Tensor,
-    size: tuple[int, ...],
-    offset: tuple[int, ...] = 0,
-    mode: str = "constant",
-    value: float = 0,
-) -> torch.Tensor:
-    offset = offset if isinstance(offset, (list, tuple)) else [offset for _ in range(len(size))]
-
-    pad = []
-    for i in range(1, len(size) + 1):
-        excess = (size[-i] - x.size(-i)) / 2
-        pad.extend([floor(excess) + offset[-i], ceil(excess) - offset[-i]])
-
-    return torch.nn.functional.pad(x, pad, mode, value)
 
 
 def ConvNd(dim: int, *args, **kwargs) -> Union[nn.Conv1d, nn.Conv2d, nn.Conv3d]:

@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Optional
+from typing import ClassVar, Optional
 
 from uda.config import Config
 
@@ -20,6 +20,8 @@ class CC359Config(Config):
         random_state (int, optional): Random state for reproducibility (e.g. of kfold splits).
     """
 
+    name: ClassVar[str] = "CC359"
+
     vendor: str
     fold: Optional[int] = None
     rotate: Optional[int] = 1
@@ -27,4 +29,5 @@ class CC359Config(Config):
     imsize: tuple[int, int, int] = (192, 256, 256)
     patch_size: Optional[tuple[int, int, int]] = None
     clip_intensities: Optional[tuple[int, int]] = None
+    limit: Optional[int] = None
     random_state: Optional[int] = None

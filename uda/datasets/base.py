@@ -18,14 +18,11 @@ class classproperty(object):
 
 class UDADataset(ABC):
     artifact_name: Optional[str] = None
+
     class_labels: dict[int, str]
     config: Config
     imsize: Optional[tuple[int, int, int]]
     patch_size: Optional[tuple[int, int, int]]
-
-    @classproperty
-    def name(cls) -> str:  # noqa: B902
-        return cls.__name__
 
     @abstractmethod
     def setup(self) -> None:

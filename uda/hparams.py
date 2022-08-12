@@ -1,8 +1,30 @@
 from dataclasses import dataclass, field
 from typing import Any, Optional
 
+import torch
+
 from .config import Config
-from .losses import LossCriterion, Optimizer
+from .losses import DiceBCEWithLogitsLoss, DiceWithLogitsLoss, MSEWithLogitsLoss
+
+
+def get_loss_cls(name: str) -> type[torch.nn.Module]:
+    if name == "Dice":
+        return DiceWithLogitsLoss
+    elif name == "DiceBCE":
+        return DiceBCEWithLogitsLoss
+    elif name == "BCE":
+        return torch.nn.BCEWithLogitsLoss
+    elif name == "MSE":
+        return MSEWithLogitsLoss
+    else:
+        NotImplementedError
+
+
+def get_optimizer_cls(name: str) -> type[torch.optim.Optimizer]:
+    if name == "Adam":
+        return torch.optim.Adam
+    else:
+        NotImplementedError
 
 
 @dataclass
@@ -22,8 +44,8 @@ class HParams(Config):
     """
 
     epochs: int = 10
-    criterion: LossCriterion = LossCriterion.BCE
-    optimizer: Optimizer = Optimizer.Adam
+    criterion: str = "BCE"
+    optimizer: str = "Adam"
     learning_rate: float = 1e-4
     train_batch_size: int = 1
     val_batch_size: int = 1

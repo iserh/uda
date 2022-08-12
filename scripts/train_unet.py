@@ -6,10 +6,10 @@ from ignite.contrib.handlers.wandb_logger import WandBLogger
 from ignite.engine import Events
 from ignite.handlers import EpochOutputStore
 
-from uda import HParams, get_criterion, get_preds_output_transform, optimizer_cls, pipe, to_cpu_output_transform
+from uda import HParams, get_loss_cls, get_optimizer_cls
 from uda.datasets import UDADataset
 from uda.models import UNet, UNetConfig
-from uda.trainer import SegTrainer, segmentation_standard_metrics
+from uda.trainer import SegTrainer, segmentation_standard_metrics, get_preds_output_transform, pipe, to_cpu_output_transform
 from uda_wandb.evaluation import prediction_image_plot
 
 
@@ -20,8 +20,8 @@ def run(dataset: UDADataset, hparams: HParams, model_config: UNetConfig, use_wan
     dataset.setup()
 
     model = UNet(model_config)
-    optim = optimizer_cls(hparams.optimizer)(model.parameters(), lr=hparams.learning_rate)
-    loss_fn = get_criterion(hparams.criterion)(**hparams.loss_kwargs)
+    optim = get_optimizer_cls(hparams.optimizer)(model.parameters(), lr=hparams.learning_rate)
+    loss_fn = get_loss_cls(hparams.criterion)(**hparams.loss_kwargs)
 
     trainer = SegTrainer(
         model=model,

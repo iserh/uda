@@ -5,8 +5,9 @@ from typing import Union
 import torch
 import torch.nn as nn
 
+from ..transforms import center_pad
 from .configuration_unet import UNetConfig
-from .modules import ConvBlock, ConvNd, DownsampleBlock, UpsampleBlock, center_pad_crop, init_weights
+from .modules import ConvBlock, ConvNd, DownsampleBlock, UpsampleBlock, init_weights
 
 
 class UNetEncoder(nn.Module):
@@ -67,12 +68,12 @@ class UNetDecoder(nn.Module):
         for block, h in zip(self.upsample_blocks, reversed(hidden_states)):
             if self.concat_hidden:
                 x = block.upsample(x)
-                h = center_pad_crop(h, x.shape[2:])
+                h = center_pad(h, x.shape[2:])
                 x = torch.cat([x, h], dim=1)
                 x = block.conv_block(x)
             else:
                 x = block(x)
-                h = center_pad_crop(h, x.shape[2:])
+                h = center_pad(h, x.shape[2:])
                 x = x + h
 
         return self.out_block(x)

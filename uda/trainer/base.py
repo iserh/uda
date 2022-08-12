@@ -16,4 +16,4 @@ class BaseEvaluator(Engine, ABC):
 
 
 def dice_score_fn(engine: Engine) -> float:
-    return engine.state.metrics["dice"][0].item()
+    return engine.state.metrics["dice"].mean().item()

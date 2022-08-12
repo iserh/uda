@@ -1,33 +1,40 @@
-from enum import Enum
+from typing import Optional
 
 import torch
 import torch.nn as nn
 
-
-class _LossCriterion(Enum):
-    ...
-
-
-class LossCriterion(str, Enum):
-    ...
+from .metrics import dice_score
 
 
 class DiceWithLogitsLoss(nn.Module):
     """Combines Sigmoid layer and DiceLoss."""
 
-    def __init__(self, squared_pred: bool = True, smooth: float = 1e-6) -> None:
+    def __init__(self, smooth: float = 1e-6, ignore_index: Optional[int] = None, reduction: str = "mean") -> None:
         super(DiceWithLogitsLoss, self).__init__()
-        self.squared_pred = squared_pred
         self.smooth = smooth
+        self.ignore_index = ignore_index
+        self.reduction = reduction
 
     def forward(self, y_pred: torch.Tensor, y_true: torch.Tensor) -> torch.Tensor:
-        return dice_loss(y_pred, y_true, self.squared_pred, self.smooth)
+        num_classes = y_pred.shape[1]
+        # apply sigmoid / softmax activation depending on binary classification or multiclass
+        if num_classes == 1:
+            y_pred = y_pred.sigmoid()
+        else:
+            y_pred = y_pred.softmax(1)
+
+        dsc = dice_score(y_pred, y_true, self.smooth)
+
+        if self.ignore_index is not None:
+            dsc = torch.cat((dsc[: self.ignore_index], dsc[self.ignore_index + 1 :]))
+
+        return (1 - dsc.mean()) if self.reduction == "mean" else (1 - dsc)
 
 
 class DiceBCEWithLogitsLoss(nn.Module):
-    def __init__(self, squared_pred: bool = True, smooth: float = 1e-6, *args, **kwargs) -> None:
+    def __init__(self, smooth: float = 1e-6, ignore_index: Optional[int] = None, *args, **kwargs) -> None:
         super(DiceBCEWithLogitsLoss, self).__init__()
-        self.dice_loss = DiceWithLogitsLoss(squared_pred, smooth)
+        self.dice_loss = DiceWithLogitsLoss(smooth, ignore_index)
         self.bce_loss = nn.BCEWithLogitsLoss(*args, **kwargs)
 
     def forward(self, y_pred: torch.Tensor, y_true: torch.Tensor) -> torch.Tensor:
@@ -43,63 +50,5 @@ class MSEWithLogitsLoss(nn.Module):
         return self.mse_loss(y_pred.sigmoid(), y_true)
 
 
-def dice_loss(
-    y_pred: torch.Tensor,
-    y_true: torch.Tensor,
-    squared_pred: bool = True,
-    smooth: float = 1e-6,
-) -> torch.Tensor:
-    if y_pred.shape[1] == 1:
-        y_pred = torch.sigmoid(y_pred)
-    else:
-        y_pred = torch.softmax(y_pred, dim=1)
-
-    # flatten
-    y_pred = y_pred.flatten()
-    y_true = y_true.flatten()
-    num = 2 * (y_pred * y_true).sum() + smooth
-
-    if squared_pred:
-        denom = (y_pred**2).sum() + (y_true**2).sum() + smooth
-    else:
-        denom = y_pred.sum() + y_true.sum() + smooth
-
-    return 1 - num / denom
-
-
-def kl_loss(mean: torch.Tensor, v_log: torch.Tensor) -> torch.Tensor:
+def kl_std_div(mean: torch.Tensor, v_log: torch.Tensor) -> torch.Tensor:
     return (v_log.exp() + mean**2 - 1 - v_log).mean()
-
-
-class _LossCriterion(Enum):  # noqa: F811
-    Dice = DiceWithLogitsLoss
-    DiceBCE = DiceBCEWithLogitsLoss
-    BCE = nn.BCEWithLogitsLoss
-    MSE = MSEWithLogitsLoss
-
-
-class LossCriterion(str, Enum):  # noqa: F811
-    """Supported loss functions."""
-
-    Dice = _LossCriterion.Dice.name
-    DiceBCE = _LossCriterion.DiceBCE.name
-    BCE = _LossCriterion.BCE.name
-    MSE = _LossCriterion.MSE.name
-
-
-class _Optimizer(Enum):
-    Adam = torch.optim.Adam
-
-
-class Optimizer(str, Enum):
-    """Supported loss functions."""
-
-    Adam = _Optimizer.Adam.name
-
-
-def get_criterion(criterion_name: str) -> type[nn.Module]:
-    return _LossCriterion[criterion_name].value
-
-
-def optimizer_cls(optimizer_name: str) -> type[torch.optim.Optimizer]:
-    return _Optimizer[optimizer_name].value
