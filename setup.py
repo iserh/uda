@@ -1,8 +1,12 @@
 #!/usr/bin/env python
-from distutils.core import setup
+from setuptools import setup
 
 with open("requirements.txt") as f:
     deps = f.read().split("\n")
+
+# surface-distance
+deps.append("surface-distance-based-measures")
+dep_links = ["git+ssh://git@github.com/deepmind/surface-distance#egg=surface-distance-based-measures"]
 
 with open("dev-requirements.txt") as f:
     dev_deps = f.read().split("\n")
@@ -22,8 +26,8 @@ setup(
     author_email="iserhenri@gmail.com",
     url="https://github.com/ndoll1998/uda/tree/master",
     extras_require=extras,
-    # install_requires=["surface_distance_based_measures @ git+ssh://git@github.com/deepmind/surface-distance.git"],
-    dependency_links=["http://github.com/deepmind/surface-distance.git#egg=surface-distance-based-measures-1.0"],
+    install_requires=deps,
+    dependency_links=dep_links,
     packages=['uda'],
     package_dir={'uda': 'uda', 'uda_wandb': 'uda_wandb'},
     classifiers=[
