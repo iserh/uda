@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-from setuptools import setup
+from setuptools import setup, find_packages
 
 with open("requirements.txt") as f:
     deps = f.read().split("\n")
@@ -21,8 +21,7 @@ setup(
     author="Henri Iser",
     author_email="iserhenri@gmail.com",
     url="https://github.com/ndoll1998/uda/tree/master",
-    packages=['uda'],
-    package_dir={'uda': 'uda', 'uda_wandb': 'uda_wandb'},
+    packages=find_packages(include=["uda*", "uda_wandb*"]),
     extras_require=extras,
     install_requires=deps,
     classifiers=[
