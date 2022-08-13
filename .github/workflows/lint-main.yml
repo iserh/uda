@@ -21,6 +21,6 @@ jobs:
       - name: Install package with dev extra
         run: |
           pip install .[dev]
-      - name: Run tests
+      - name: Run linting
         run: flake8 $(git ls-files '*.py')
 

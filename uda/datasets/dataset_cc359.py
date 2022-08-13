@@ -24,6 +24,7 @@ class CC359(UDADataset):
         config (Union[CC359Config, str]): Either path to config file or config object itself.
         root (str, optional): Path where dataset is located. Defaults to "/tmp/data".
     """
+
     artifact_name = "iserh/UDA-Datasets/CC359-Skull-stripping:latest"
     class_labels = {1: "brain"}
 

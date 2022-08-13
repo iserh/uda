@@ -1,6 +1,6 @@
 [tool.black]
 line-length = 120
-extend-exclude = ["surface_distance"]
+extend-exclude = "surface_distance"
 
 [tool.coverage.report]
 show_missing = true
