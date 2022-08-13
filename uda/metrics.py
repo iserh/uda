@@ -1,7 +1,8 @@
 import torch
 from ignite.utils import to_onehot
-from surface_distance import compute_surface_dice_at_tolerance, compute_surface_distances
 from tqdm import tqdm
+
+from surface_distance import compute_surface_dice_at_tolerance, compute_surface_distances
 
 
 def dice_score(y_pred: torch.Tensor, y_true: torch.Tensor, eps: float = 1e-5) -> torch.Tensor:

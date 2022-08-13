@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-from setuptools import setup, find_packages
+from setuptools import find_packages, setup
 
 with open("requirements.txt") as f:
     deps = f.read().split("\n")
@@ -8,8 +8,8 @@ with open("requirements-dev.txt") as f:
     dev_deps = f.read().split("\n")
 
 extras = {
-   'wandb': ['wandb>=0.13.1'],
-   'dev': dev_deps,
+    "wandb": ["wandb>=0.13.1"],
+    "dev": dev_deps,
 }
 
 setup(
@@ -17,7 +17,7 @@ setup(
     version="0.1.1",
     description="Unsupervised Domain Adaptation",
     long_description=open("README.md", "r").read(),
-    long_description_content_type='text/markdown',
+    long_description_content_type="text/markdown",
     author="Henri Iser",
     author_email="iserhenri@gmail.com",
     url="https://github.com/iserh/uda/tree/main",
@@ -30,6 +30,6 @@ setup(
         "License :: Freely Distributable",
         "License :: OSI Approved :: Apache Software License",
         "Programming Language :: Python :: 3",
-        "Topic :: Scientific/Engineering :: Image Recognition"
-    ]
+        "Topic :: Scientific/Engineering :: Image Recognition",
+    ],
 )

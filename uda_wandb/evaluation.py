@@ -8,9 +8,9 @@ import wandb
 from ignite.contrib.handlers.tqdm_logger import ProgressBar
 from ignite.engine import Engine
 from ignite.handlers import EpochOutputStore
-from surface_distance import compute_surface_dice_at_tolerance, compute_surface_distances
 from tqdm import tqdm
 
+from surface_distance import compute_surface_dice_at_tolerance, compute_surface_distances
 from uda import HParams, get_preds_output_transform, pipe, reshape_to_volume, to_cpu_output_transform
 from uda.datasets import UDADataset
 from uda.metrics import dice_score

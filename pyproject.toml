@@ -1,10 +1,14 @@
+[tool.black]
+line-length = 120
+extend-exclude = ["surface_distance"]
+
 [tool.coverage.report]
 show_missing = true
 
 [tool.coverage.run]
 branch = true
 omit = ["**/__init__.py"]
-source = ["uda"]
+source = ["uda", "uda_wandb"]
 
 [tool.isort]
 ensure_newline_before_comments = true

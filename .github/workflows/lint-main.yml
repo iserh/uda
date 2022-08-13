@@ -1,4 +1,4 @@
-name: Tests
+name: Lint
 on:
   push:
     branches: [ main ]
@@ -20,8 +20,7 @@ jobs:
           python-version: 3.9
       - name: Install package with dev extra
         run: |
-          pip install .
-          pip install pytest pytest-cov pytest-mock
+          pip install .[dev]
       - name: Run tests
-        run: python -m pytest
+        run: flake8 $(git ls-files '*.py')
 
