@@ -18,7 +18,9 @@ jobs:
         with:
           python-version: 'pypy3.9'
       - name: Install package with dev extra
-        run: pip install ".[dev]"
+        run:
+          pip install .
+          pip install pytest
       - name: Run tests
         run: python -m pytest
 

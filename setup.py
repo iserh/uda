@@ -30,6 +30,6 @@ setup(
         "License :: Freely Distributable",
         "License :: OSI Approved :: Apache Software License",
         "Programming Language :: Python :: 3",
-        "Topic :: Scientific/Engineering :: Medical Image Analysis"
+        "Topic :: Scientific/Engineering :: Image Recognition"
     ]
 )
