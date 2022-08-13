@@ -18,6 +18,7 @@ jobs:
           python-version: 'pypy3.9'
       - name: Install package with dev extra
         run:
+          apt install libopenblas-dev
           pip install .
           pip install pytest
       - name: Run tests
