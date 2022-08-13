@@ -9,7 +9,7 @@ with open("requirements-dev.txt") as f:
     dev_deps = f.read().split("\n")
 
 extras = {
-   'wandb': ['wandb>=0.12.21'],
+   'wandb': ['wandb>=0.13.1'],
    'dev': dev_deps,
 }
 
