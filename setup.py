@@ -5,9 +5,6 @@ from pathlib import Path
 with open("requirements.txt") as f:
     deps = f.read().split("\n")
 
-# surface distances dependency
-deps.append(f"surface-distance-based-measures @ {(Path.cwd() / 'surface-distance').as_uri()}#egg=surface-distance-based-measures")
-
 with open("requirements-dev.txt") as f:
     dev_deps = f.read().split("\n")
 
@@ -25,7 +22,7 @@ setup(
     author="Henri Iser",
     author_email="iserhenri@gmail.com",
     url="https://github.com/iserh/uda/tree/main",
-    packages=find_packages(include=["uda*", "uda_wandb*"]),
+    packages=find_packages(include=["uda*", "uda_wandb*", "surface_distance"]),
     extras_require=extras,
     install_requires=deps,
     classifiers=[
