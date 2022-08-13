@@ -1,24 +1,24 @@
 name: Tests
 on:
   push:
-    branches: [ master ]
+    branches: [ main ]
   pull_request:
-    branches: [ master ]
+    branches: [ main ]
 
 jobs:
   test:
     name: Test
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v3
       - name: Set up Python 3.9
-        uses: actions/setup-python@v4 
+        uses: actions/setup-python@v4
         with:
           python-version: 'pypy3.9'
       - name: Install package with dev extra
         run: pip install ".[dev]"
       - name: Run tests
         run: python -m pytest
-        
+
