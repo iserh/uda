@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 from setuptools import setup, find_packages
-from pathlib import Path
 
 with open("requirements.txt") as f:
     deps = f.read().split("\n")
