@@ -1,7 +1,9 @@
 name: PyPI
-on:
-  push:
-    branches: []
+# on:
+#   push:
+#     branches: [ main ]
+#   pull_request:
+#     branches: [ main ]
 
 
 jobs:
