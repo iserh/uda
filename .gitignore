@@ -11,6 +11,7 @@ dist
 htmlcov
 data
 config
+logs
 
 # files
 .coverage
