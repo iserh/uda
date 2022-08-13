@@ -15,7 +15,7 @@ extras = {
 
 setup(
     name="uda-medical",
-    version="0.1.0",
+    version="0.1.1",
     description="Unsupervised Domain Adaptation",
     long_description=open("README.md", "r").read(),
     long_description_content_type='text/markdown',
