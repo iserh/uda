@@ -11,9 +11,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@master
+        with:
+          submodules: recursive
       - name: Set up Python 3.9
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@master
         with:
           python-version: 3.9
       - name: Install package with dev extra
