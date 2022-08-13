@@ -1,5 +1,6 @@
 # Unsupervised Domain Adaptation
-[![Tests](https://github.com/iserh/uda/actions/workflows/test-master.yml/badge.svg)](https://github.com/iserh/uda/actions/workflows/test-master.yml)
+[![Tests](https://github.com/iserh/uda/actions/workflows/test-main.yml/badge.svg?branch=main)](https://github.com/iserh/uda/actions/workflows/test-main.yml)
+[![Lint](https://github.com/iserh/uda/actions/workflows/lint-main.yml/badge.svg?branch=main)](https://github.com/iserh/uda/actions/workflows/lint-main.yml)
 ## Installation
 Simply run
 ```sh
