@@ -13,14 +13,14 @@ extras = {
 }
 
 setup(
-    name="uda",
+    name="uda-medical",
     version="0.1.0",
     description="Unsupervised Domain Adaptation",
     long_description=open("README.md", "r").read(),
     long_description_content_type='text/markdown',
     author="Henri Iser",
     author_email="iserhenri@gmail.com",
-    url="https://github.com/ndoll1998/uda/tree/master",
+    url="https://github.com/iserh/uda/tree/main",
     packages=find_packages(include=["uda*", "uda_wandb*"]),
     extras_require=extras,
     install_requires=deps,
