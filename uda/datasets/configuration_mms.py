@@ -11,8 +11,6 @@ class MAndMsConfig(Config):
     Args:
     """
 
-    name: ClassVar[str] = "CC359"
-
     phases: tuple[str] = ("ED", "ES")
     unlabeled: bool = False
     flatten: bool = False

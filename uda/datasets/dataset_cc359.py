@@ -26,7 +26,7 @@ class CC359(UDADataset):
     """
 
     artifact_name = "iserh/UDA-Datasets/CC359-Skull-stripping:latest"
-    class_labels = {1: "brain"}
+    class_labels = {0: "Background", 1: "brain"}
 
     def __init__(self, config: Union[CC359Config, str], root: str = "/tmp/data") -> None:
         if not isinstance(config, CC359Config):
@@ -93,8 +93,8 @@ class CC359(UDADataset):
             targets = pt.patchify_to_batches(targets, self.patch_size, batch_dim=1)
 
         if self.flatten:
-            data = pt.collapse_dims(data, dims=(1, -3))
-            targets = pt.collapse_dims(targets, dims=(1, -3))
+            data = pt.collapse_dims(data, dims=(1, data.ndim-3))
+            targets = pt.collapse_dims(targets, dims=(1, targets.ndim-3))
 
         if self.fold is not None:
             # split data & targets into train/val
@@ -110,9 +110,9 @@ class CC359(UDADataset):
 
         # collapse batch_dim and flatten_dim/patch_dim; unsqueeze for channel dim
         X_train = pt.collapse_dims(X_train, dims=(0, 1)).unsqueeze(1)
-        X_val = pt.collapse_dims(X_val, dims=(0, 1))
+        X_val = pt.collapse_dims(X_val, dims=(0, 1)).unsqueeze(1)
         y_train = pt.collapse_dims(y_train, dims=(0, 1)).unsqueeze(1)
-        y_val = pt.collapse_dims(y_val, dims=(0, 1))
+        y_val = pt.collapse_dims(y_val, dims=(0, 1)).unsqueeze(1)
 
         self.train_split = TensorDataset(X_train, y_train)
         self.val_split = TensorDataset(X_val, y_val)

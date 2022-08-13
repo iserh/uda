@@ -11,7 +11,8 @@ from ignite.handlers import EpochOutputStore
 from tqdm import tqdm
 
 from surface_distance import compute_surface_dice_at_tolerance, compute_surface_distances
-from uda import HParams, get_preds_output_transform, pipe, reshape_to_volume, to_cpu_output_transform
+from uda import HParams
+from uda.trainer import get_preds_output_transform, pipe, to_cpu_output_transform
 from uda.datasets import UDADataset
 from uda.metrics import dice_score
 from uda.models import VAE, UNet

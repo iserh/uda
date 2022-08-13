@@ -9,8 +9,6 @@ from ..config import Config
 class VAEConfig(Config):
     """Configuration for Variational Autoencoder."""
 
-    name: ClassVar[str] = "VAE"
-
     input_size: tuple[int, ...]
     encoder_blocks: tuple[tuple[int, ...], ...]
     decoder_blocks: tuple[tuple[int, ...], ...]

@@ -44,7 +44,7 @@ def run(teacher: UNet, vae: VAE, dataset: UDADataset, hparams: HParams, use_wand
         pseudo_val_loader=val_loader,  # pseudo labels
         val_loader=true_val_loader,  # real labels
         patience=hparams.early_stopping_patience,
-        metrics=joint_standard_metrics(loss_fn, hparams.vae_lambd),
+        metrics=joint_standard_metrics(loss_fn, len(dataset.class_labels), hparams.vae_lambd),
         cache_dir=wandb.run.dir if use_wandb else "/tmp/models/student",
     )
 

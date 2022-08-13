@@ -20,25 +20,27 @@ def to_cpu_output_transform(output: tuple[torch.Tensor, ...]) -> tuple[torch.Ten
 
 
 def get_preds_output_transform(output: tuple[torch.Tensor, torch.Tensor]) -> tuple[torch.Tensor, torch.Tensor]:
-    y_pred = output[0]
-    other = output[1:] if len(output) > 1 else []
+    y_pred, y_true = output[:2]
+    other = output[2:] if len(output) > 2 else []
 
     if y_pred.shape[1] == 1:
-        preds = y_pred.sigmoid().round().long()
+        preds = y_pred.sigmoid().round().long().squeeze()
+        targets = y_true.long().squeeze()
     else:
         preds = y_pred.argmax(1)
+        targets = y_true.argmax(1)
 
-    return preds, *other
+    return preds, targets, *other
 
 
 def one_hot_output_transform(output: tuple[torch.Tensor, torch.Tensor]) -> tuple[torch.Tensor, torch.Tensor]:
-    y_pred = output[0]
-    other = output[1:] if len(output) > 1 else []
+    y_pred, y_true = output[:2]
+    other = output[2:] if len(output) > 2 else []
 
-    num_classes = y_pred.shape[1]
-    y_pred = get_preds_output_transform((y_pred,))
+    num_classes = max(y_pred.shape[1], 2)  # if only one channel it's binary segmentation with sigmoid act
+    preds, targets = get_preds_output_transform((y_pred, y_true))
 
-    return to_onehot(y_pred, num_classes), *other
+    return to_onehot(preds, num_classes), targets, *other
 
 
 def flatten_output_transform(output: tuple[torch.Tensor, torch.Tensor], dim: int = 0) -> None:

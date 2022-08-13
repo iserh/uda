@@ -20,8 +20,6 @@ class CC359Config(Config):
         random_state (int, optional): Random state for reproducibility (e.g. of kfold splits).
     """
 
-    name: ClassVar[str] = "CC359"
-
     vendor: str
     fold: Optional[int] = None
     rotate: Optional[int] = 1

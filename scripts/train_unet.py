@@ -36,7 +36,7 @@ def run(dataset: UDADataset, hparams: HParams, model_config: UNetConfig, use_wan
         val_loader=dataset.val_dataloader(hparams.val_batch_size),
         loss_fn=loss_fn,
         patience=hparams.early_stopping_patience,
-        metrics=segmentation_standard_metrics(loss_fn, model.config.out_channels),
+        metrics=segmentation_standard_metrics(loss_fn, len(dataset.class_labels)),
         cache_dir=wandb.run.dir if use_wandb else "/tmp/models/student",
     )
 

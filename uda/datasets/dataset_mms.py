@@ -14,6 +14,7 @@ from tqdm import tqdm
 from ..transforms import center_pad
 from .base import UDADataset
 from .configuration_mms import MAndMsConfig
+from ignite.utils import to_onehot
 
 
 class MAndMs(UDADataset):
@@ -25,7 +26,7 @@ class MAndMs(UDADataset):
     """
 
     artifact_name = "iserh/UDA-Datasets/MAndMs:latest"
-    class_labels = {1: "left ventricle (LV)", 2: "myocardium (MYO)", 3: "right ventricle (RV)"}
+    class_labels = {0: "Background", 1: "left ventricle (LV)", 2: "myocardium (MYO)", 3: "right ventricle (RV)"}
 
     def __init__(self, config: Union[MAndMsConfig, str], root: str = "/tmp/data") -> None:
         if not isinstance(config, MAndMsConfig):
@@ -121,7 +122,7 @@ class MAndMs(UDADataset):
 
             # from here on -> torch backend
             img = torch.from_numpy(img)
-            mask = torch.from_numpy(mask).long()
+            mask = torch.from_numpy(mask)
             spacing = torch.from_numpy(spacing)
 
             # pad & crop
@@ -144,7 +145,11 @@ class MAndMs(UDADataset):
         # optional flatten & add channel dim
         if self.flatten:
             # transpose z_dim next to batch_dim
-            data = pt.collapse_dims(data, dims=(0, -3))
-            targets = pt.collapse_dims(targets, dims=(0, -3))
+            data = pt.collapse_dims(data, dims=(0, data.ndim-3))
+            targets = pt.collapse_dims(targets, dims=(0, targets.ndim-3))
+
+        # add channel dim
+        data = data.unsqueeze(1)
+        targets = to_onehot(targets.long(), num_classes=4).float()
 
         return TensorDataset(data, targets), spacings

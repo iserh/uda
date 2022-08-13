@@ -9,8 +9,6 @@ from ..config import Config
 class UNetConfig(Config):
     """Configuration for U-Net."""
 
-    name: ClassVar[str] = "UNet"
-
     out_channels: int
     encoder_blocks: list[list[int]]
     decoder_blocks: list[list[int]]

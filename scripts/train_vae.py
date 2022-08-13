@@ -30,7 +30,7 @@ def run(dataset: UDADataset, hparams: HParams, model_config: VAEConfig, use_wand
         loss_fn=loss_fn,
         beta=hparams.vae_beta,
         patience=hparams.early_stopping_patience,
-        metrics=vae_standard_metrics(loss_fn, hparams.vae_beta),
+        metrics=vae_standard_metrics(loss_fn, len(dataset.class_labels), hparams.vae_beta),
         cache_dir=wandb.run.dir if use_wandb else "/tmp/models/student",
     )
 
