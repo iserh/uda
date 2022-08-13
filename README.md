@@ -1,4 +1,6 @@
 # Unsupervised Domain Adaptation
+[![PyPI](https://github.com/iserh/uda/actions/workflows/publish-to-pypi.yml/badge.svg)](https://github.com/iserh/uda/actions/workflows/publish-to-pypi.yml)
+[![Tests](https://github.com/iserh/uda/actions/workflows/test-master.yml/badge.svg)](https://github.com/iserh/uda/actions/workflows/test-master.yml)
 ## Installation
 Simply run
 ```sh
