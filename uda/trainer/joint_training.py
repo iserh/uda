@@ -40,7 +40,7 @@ class JointEvaluator(BaseEvaluator):
 
         x = center_pad(x, y_pred.shape[2:])
 
-        return y_pred, y_true, y_vae, y_rec, x
+        return y_pred, y_true, x, y_vae, y_rec
 
 
 class JointTrainer(BaseEvaluator):
@@ -144,7 +144,7 @@ class JointTrainer(BaseEvaluator):
 def joint_standard_metrics(loss_fn: nn.Module, num_classes: int, lambd: float) -> dict[str, Metric]:
     return {
         "pseudo_loss": Loss(loss_fn, output_transform=lambda o: o[:2]),
-        "rec_loss": Loss(lambda *args: loss_fn(*args) * lambd, output_transform=lambda o: o[2:4]),
+        "rec_loss": Loss(lambda *args: loss_fn(*args) * lambd, output_transform=lambda o: o[3:5]),
         "dice": DiceCoefficient(
             ConfusionMatrix(
                 num_classes=num_classes,

@@ -93,8 +93,8 @@ class CC359(UDADataset):
             targets = pt.patchify_to_batches(targets, self.patch_size, batch_dim=1)
 
         if self.flatten:
-            data = pt.collapse_dims(data, dims=(1, data.ndim-3))
-            targets = pt.collapse_dims(targets, dims=(1, targets.ndim-3))
+            data = pt.collapse_dims(data, dims=(1, data.ndim - 3), target_dim=1)
+            targets = pt.collapse_dims(targets, dims=(1, targets.ndim - 3), target_dim=1)
 
         if self.fold is not None:
             # split data & targets into train/val
@@ -102,8 +102,8 @@ class CC359(UDADataset):
             train_indices, val_indices = list(kf.split(files))[self.fold]
             X_train, X_val = data[train_indices], data[val_indices]
             y_train, y_val = targets[train_indices], targets[val_indices]
-            self.train_spacings = spacings[train_indices]
-            self.val_spacings = spacings[val_indices]
+            self.train_spacings = spacings[train_indices].squeeze()
+            self.val_spacings = spacings[val_indices].squeeze()
         else:
             X_train = X_val = data
             y_train = y_val = targets

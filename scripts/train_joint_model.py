@@ -71,14 +71,12 @@ def run(teacher: UNet, vae: VAE, dataset: UDADataset, hparams: HParams, use_wand
             event_name=Events.EPOCH_COMPLETED,
             handler=prediction_image_plot,
             evaluator=trainer.val_evaluator,
-            dim=model.config.dim,
-            class_labels=dataset.class_labels,
-            imsize=dataset.imsize,
-            patch_size=dataset.patch_size,
+            dataset=dataset,
+            name="validation",
         )
         # table evaluation functions needs predictions from validation set
         eos = EpochOutputStore(
-            output_transform=pipe(lambda o: (*o[:2], o[4]), get_preds_output_transform, to_cpu_output_transform)
+            output_transform=pipe(lambda o: o[:3], get_preds_output_transform, to_cpu_output_transform)
         )
         eos.attach(trainer.val_evaluator, "output")
 
@@ -112,6 +110,7 @@ if __name__ == "__main__":
         import wandb
 
         from uda.datasets import CC359Config
+        from uda.trainer import SegEvaluator
         from uda_wandb import (
             RunConfig,
             cross_evaluate_unet,
@@ -163,9 +162,9 @@ if __name__ == "__main__":
             run(teacher, vae, dataset, hparams, use_wandb=True)
 
         if args.evaluate:
-            evaluate(run_cfg, table_plot=True)
+            evaluate(SegEvaluator, UNet, dataset, hparams, run_cfg, splits=["validation", "testing"])
         if args.cross_eval:
-            cross_evaluate_unet(run_cfg, table_plot=True)
+            cross_evaluate_unet(SegEvaluator, UNet, dataset, hparams, run_cfg)
         if not args.store:
             delete_model_binaries(run_cfg)
     else:

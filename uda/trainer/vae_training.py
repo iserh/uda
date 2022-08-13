@@ -33,7 +33,7 @@ class VaeEvaluator(BaseEvaluator):
         x = center_pad(x, y_rec.shape[2:])
         y = center_pad(y, y_rec.shape[2:])
 
-        return y_rec, y, mean, v_log, x
+        return y_rec, y, x, mean, v_log
 
 
 class VaeTrainer(BaseEvaluator):
@@ -109,7 +109,7 @@ class VaeTrainer(BaseEvaluator):
 def vae_standard_metrics(loss_fn: nn.Module, num_classes: int, beta: float) -> dict[str, Metric]:
     return {
         "rec_loss": Loss(loss_fn, output_transform=lambda o: o[:2]),
-        "kl_loss": Loss(lambda *args: kl_std_div(*args) * beta, output_transform=lambda o: o[2:4]),
+        "kl_loss": Loss(lambda *args: kl_std_div(*args) * beta, output_transform=lambda o: o[3:5]),
         "dice": DiceCoefficient(
             ConfusionMatrix(
                 num_classes=num_classes,

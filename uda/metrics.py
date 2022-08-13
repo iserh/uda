@@ -1,3 +1,6 @@
+from itertools import chain
+from typing import Optional
+
 import torch
 from ignite.utils import to_onehot
 from tqdm import tqdm
@@ -5,7 +8,15 @@ from tqdm import tqdm
 from surface_distance import compute_surface_dice_at_tolerance, compute_surface_distances
 
 
-def dice_score(y_pred: torch.Tensor, y_true: torch.Tensor, eps: float = 1e-5) -> torch.Tensor:
+def remove_idx(t: torch.Tensor, idx: int, dim: int) -> torch.Tensor:
+    assert idx < t.shape[dim]
+    indices = torch.LongTensor(list(chain(range(idx), range(idx + 1, t.shape[dim]))))
+    return torch.index_select(t, dim, indices)
+
+
+def dice_score(
+    y_pred: torch.Tensor, y_true: torch.Tensor, ignore_index: Optional[int] = None, eps: float = 1e-5
+) -> torch.Tensor:
     """Computes the class-wise dice coefficient.
 
     Args:
@@ -27,6 +38,10 @@ def dice_score(y_pred: torch.Tensor, y_true: torch.Tensor, eps: float = 1e-5) ->
 
     assert y_pred.shape == y_true.shape
 
+    if ignore_index is not None:
+        y_pred = remove_idx(y_pred, ignore_index, dim=1)
+        y_true = remove_idx(y_true, ignore_index, dim=1)
+
     # flatten
     y_pred = y_pred.transpose(1, 0).flatten(1)
     y_true = y_true.transpose(1, 0).flatten(1)
@@ -42,6 +57,7 @@ def surface_dice(
     y_true: torch.Tensor,
     spacings_mm: torch.Tensor,
     tolerance_mm: float,
+    ignore_index: Optional[int] = None,
     prog_bar: bool = True,
 ) -> torch.Tensor:
     """Computes the class-wise surface-dice.
@@ -65,6 +81,10 @@ def surface_dice(
 
     assert y_pred.shape == y_true.shape
 
+    if ignore_index is not None:
+        y_pred = remove_idx(y_pred, ignore_index, dim=1)
+        y_true = remove_idx(y_true, ignore_index, dim=1)
+
     batch_size, num_classes = y_pred.shape[:2]
     # collect batch & classes in one axis
     y_pred = y_pred.reshape(-1, *y_pred.shape[2:])
@@ -77,7 +97,7 @@ def surface_dice(
         else zip(y_pred, y_true, spacings_mm)
     )
 
-    sf_dice_vals = torch.Tensor(
+    sf_dice = torch.Tensor(
         [
             compute_surface_dice_at_tolerance(
                 compute_surface_distances(mask_gt.bool().numpy(), mask_pred.bool().numpy(), spacing_mm), tolerance_mm
@@ -86,4 +106,6 @@ def surface_dice(
         ]
     )
 
-    return sf_dice_vals.reshape(batch_size, num_classes)
+    sf_dice = sf_dice.reshape(batch_size, num_classes)
+
+    return sf_dice.mean(0)

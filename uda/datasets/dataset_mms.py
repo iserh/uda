@@ -5,6 +5,7 @@ from typing import Optional, Union
 import nibabel as nib
 import numpy as np
 import torch
+from ignite.utils import to_onehot
 from nibabel.spatialimages import SpatialImage
 from pypatchify.pt import pt
 from sklearn.preprocessing import MinMaxScaler
@@ -14,7 +15,6 @@ from tqdm import tqdm
 from ..transforms import center_pad
 from .base import UDADataset
 from .configuration_mms import MAndMsConfig
-from ignite.utils import to_onehot
 
 
 class MAndMs(UDADataset):
@@ -145,8 +145,8 @@ class MAndMs(UDADataset):
         # optional flatten & add channel dim
         if self.flatten:
             # transpose z_dim next to batch_dim
-            data = pt.collapse_dims(data, dims=(0, data.ndim-3))
-            targets = pt.collapse_dims(targets, dims=(0, targets.ndim-3))
+            data = pt.collapse_dims(data, dims=(0, data.ndim - 3))
+            targets = pt.collapse_dims(targets, dims=(0, targets.ndim - 3))
 
         # add channel dim
         data = data.unsqueeze(1)

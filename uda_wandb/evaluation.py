@@ -8,14 +8,14 @@ import wandb
 from ignite.contrib.handlers.tqdm_logger import ProgressBar
 from ignite.engine import Engine
 from ignite.handlers import EpochOutputStore
-from tqdm import tqdm
+from ignite.utils import to_onehot
+from pypatchify.pt import pt
 
-from surface_distance import compute_surface_dice_at_tolerance, compute_surface_distances
 from uda import HParams
-from uda.trainer import get_preds_output_transform, pipe, to_cpu_output_transform
 from uda.datasets import UDADataset
-from uda.metrics import dice_score
+from uda.metrics import dice_score, surface_dice
 from uda.models import VAE, UNet
+from uda.trainer import get_preds_output_transform, pipe, to_cpu_output_transform
 from uda_wandb.config import RunConfig
 
 from .download import download_model
@@ -58,22 +58,15 @@ def evaluate(
 
             evaluator.run(dataloader)
 
-            preds, targets, _ = prediction_image_plot(evaluator, model.config.dim, dataset, split, n_predictions)
+            preds, targets, _ = prediction_image_plot(evaluator, dataset, split, n_predictions)
+            preds = to_onehot(preds, num_classes=len(dataset.class_labels))
 
-            all_dice, all_sdice = [], []
-            for y_pred, y_true, spacing_mm in tqdm(
-                zip(preds, targets, spacings), total=len(preds), desc="Computing Scores"
-            ):
-                all_dice.append(dice_score(y_pred, y_true))
-                all_sdice.append(
-                    compute_surface_dice_at_tolerance(
-                        compute_surface_distances(y_true.astype(bool), y_pred.astype(bool), spacing_mm),
-                        tolerance_mm=hparams.sf_dice_tolerance,
-                    )
-                )
+            dice = dice_score(preds, targets, ignore_index=0)
+            sf_dice = surface_dice(preds, targets, spacings, hparams.sf_dice_tolerance, ignore_index=0)
 
-            run.summary[f"{split}/dice"] = np.stack(all_dice).mean()
-            run.summary[f"{split}/surface_dice"] = np.array(all_sdice).mean()
+            for i, (dsc, sf_dsc) in enumerate(zip(dice, sf_dice)):
+                run.summary[f"{split}/dice/{i}"] = dsc
+                run.summary[f"{split}/surface_dice/{i}"] = sf_dsc
 
 
 def cross_evaluate_unet(
@@ -106,27 +99,19 @@ def cross_evaluate_unet(
 
             evaluator.run(dataloader)
 
-            preds, targets, _ = prediction_image_plot(evaluator, model.config.dim, dataset, vendor, n_predictions)
+            preds, targets, _ = prediction_image_plot(evaluator, dataset, vendor, n_predictions)
+            preds = to_onehot(preds, num_classes=len(dataset.class_labels))
 
-            all_dice, all_sdice = [], []
-            for y_pred, y_true, spacing_mm in tqdm(
-                zip(preds, targets, spacings), total=len(preds), desc="Computing Scores"
-            ):
-                all_dice.append(dice_score(y_pred, y_true))
-                all_sdice.append(
-                    compute_surface_dice_at_tolerance(
-                        compute_surface_distances(y_true.astype(bool), y_pred.astype(bool), spacing_mm),
-                        tolerance_mm=hparams.sf_dice_tolerance,
-                    )
-                )
+            dice = dice_score(preds, targets, ignore_index=0)
+            sf_dice = surface_dice(preds, targets, spacings, hparams.sf_dice_tolerance, ignore_index=0)
 
-            run.summary[f"{vendor}/dice"] = np.stack(all_dice).mean()
-            run.summary[f"{vendor}/surface_dice"] = np.array(all_sdice).mean()
+            for i, (dsc, sf_dsc) in enumerate(zip(dice, sf_dice)):
+                run.summary[f"{vendor}/dice/{i}"] = dsc
+                run.summary[f"{vendor}/surface_dice/{i}"] = sf_dsc
 
 
 def prediction_image_plot(
     evaluator: Engine,
-    dim: int,
     dataset: UDADataset,
     name: str,
     n_predictions: int = 6,
@@ -135,27 +120,30 @@ def prediction_image_plot(
     print("Plotting prediction images")
     preds, targets, data = [*zip(*evaluator.state.output)]
 
-    preds = torch.cat(preds).numpy()
-    targets = torch.cat(targets).numpy()
-    data = torch.cat(data).numpy()
+    preds = torch.cat(preds)
+    targets = torch.cat(targets)
+    data = torch.cat(data)
 
-    preds = reshape_to_volume(preds, dim, dataset.imsize, dataset.patch_size)
-    targets = reshape_to_volume(targets, dim, dataset.imsize, dataset.patch_size)
-    data = reshape_to_volume(data, dim, dataset.imsize, dataset.patch_size)
+    # preds/targets shape: (N, ...) - indices of predicted/gt class
+    if dataset.flatten:
+        # uncollapse Z dim from batch dim
+        preds = preds.reshape(-1, dataset.imsize[0], *preds.shape[-2:])
+        targets = targets.reshape(-1, dataset.imsize[0], *targets.shape[-2:])
+        data = data.reshape(-1, dataset.imsize[0], *data.shape[-2:])
+
+    preds = pt.unpatchify_from_batches(preds, dataset.imsize)
+    targets = pt.unpatchify_from_batches(targets, dataset.imsize)
+    data = pt.unpatchify_from_batches(data, dataset.imsize)
 
     slice_index = dataset.imsize[0] // 2
+    class_labels = {k: v for k, v in dataset.class_labels.items() if v != "Background"}
 
     for i in range(min(n_predictions, preds.shape[0])):
-        # the raw background image as a numpy array
-        img = (data[i][slice_index] * 255).astype(np.uint8)
-        y_pred = preds[i][slice_index].astype(np.uint8)
-        y_true = targets[i][slice_index].astype(np.uint8)
-
         wandb_img = wandb.Image(
-            img,
+            data[i][slice_index].numpy(),
             masks={
-                "prediction": {"mask_data": y_pred, "class_labels": dataset.class_labels},
-                "ground truth": {"mask_data": y_true, "class_labels": dataset.class_labels},
+                "prediction": {"mask_data": preds[i][slice_index].numpy(), "class_labels": class_labels},
+                "ground truth": {"mask_data": targets[i][slice_index].numpy(), "class_labels": class_labels},
             },
         )
         wandb.log({f"{name}/predictions/{i}": wandb_img}, commit=False)

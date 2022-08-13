@@ -64,14 +64,12 @@ def run(dataset: UDADataset, hparams: HParams, model_config: VAEConfig, use_wand
             event_name=Events.EPOCH_COMPLETED,
             handler=prediction_image_plot,
             evaluator=trainer.val_evaluator,
-            data=next(iter(dataset.val_dataloader())),
-            dim=model.config.dim,
             dataset=dataset,
             name="validation",
         )
         # table evaluation functions needs predictions from validation set
         eos = EpochOutputStore(
-            output_transform=pipe(lambda o: (*o[:2], o[4]), get_preds_output_transform, to_cpu_output_transform)
+            output_transform=pipe(lambda o: o[:3], get_preds_output_transform, to_cpu_output_transform)
         )
         eos.attach(trainer.val_evaluator, "output")
 
@@ -117,7 +115,7 @@ if __name__ == "__main__":
             run(dataset, hparams, model_config, use_wandb=True)
 
         if args.evaluate:
-            evaluate(VaeEvaluator, VAE, run_cfg, dataset, hparams, run_cfg, splits=["validation"])
+            evaluate(VaeEvaluator, VAE, dataset, hparams, run_cfg, splits=["validation"])
         if not args.store:
             delete_model_binaries(run_cfg)
     else:

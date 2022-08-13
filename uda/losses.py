@@ -23,10 +23,7 @@ class DiceWithLogitsLoss(nn.Module):
         else:
             y_pred = y_pred.softmax(1)
 
-        dsc = dice_score(y_pred, y_true, self.smooth)
-
-        if self.ignore_index is not None:
-            dsc = torch.cat((dsc[: self.ignore_index], dsc[self.ignore_index + 1 :]))
+        dsc = dice_score(y_pred, y_true, self.ignore_index, self.smooth)
 
         return (1 - dsc.mean()) if self.reduction == "mean" else (1 - dsc)
 
