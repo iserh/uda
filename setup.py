@@ -1,8 +1,12 @@
 #!/usr/bin/env python
 from setuptools import setup, find_packages
+from pathlib import Path
 
 with open("requirements.txt") as f:
     deps = f.read().split("\n")
+
+# surface distances dependency
+deps.append(f"surface-distance-based-measures @ {(Path.cwd() / 'surface-distance').as_uri()}#egg=surface-distance-based-measures")
 
 with open("requirements-dev.txt") as f:
     dev_deps = f.read().split("\n")
