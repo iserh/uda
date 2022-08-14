@@ -114,8 +114,9 @@ if __name__ == "__main__":
             download_dataset(dataset)
             run(dataset, hparams, model_config, use_wandb=True)
 
-        if args.evaluate:
-            evaluate(VaeEvaluator, VAE, dataset, hparams, run_cfg, splits=["validation"])
+            if args.evaluate:
+                evaluate(VaeEvaluator, VAE, dataset, hparams, splits=["validation"])
+
         if not args.store:
             delete_model_binaries(run_cfg)
     else:

@@ -121,10 +121,11 @@ if __name__ == "__main__":
             download_dataset(dataset)
             run(dataset, hparams, model_config, use_wandb=True)
 
-        if args.evaluate:
-            evaluate(SegEvaluator, UNet, dataset, hparams, run_cfg, splits=["validation", "testing"])
-        if args.cross_eval:
-            cross_evaluate_unet(SegEvaluator, UNet, dataset, hparams, run_cfg)
+            if args.evaluate:
+                evaluate(SegEvaluator, UNet, dataset, hparams, splits=["validation", "testing"])
+            if args.cross_eval:
+                cross_evaluate_unet(SegEvaluator, UNet, dataset, hparams)
+
         if not args.store:
             delete_model_binaries(run_cfg)
     else:

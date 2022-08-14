@@ -1,4 +1,5 @@
 """Evaluation functions for wandb."""
+from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Union
 
@@ -28,45 +29,42 @@ def evaluate(
     Model: Union[type[VAE], type[UNet]],
     dataset: UDADataset,
     hparams: HParams,
-    run_cfg: RunConfig,
     splits: list[str] = ["validation"],
     n_predictions: int = 6,
 ) -> None:
     print()
-    print(f"Evaluating run {run_cfg.run_id}\n")
+    print(f"Evaluating run\n")
 
-    with wandb.init(project=run_cfg.project, id=run_cfg.run_id, resume=True) as run:
-        with TemporaryDirectory() as tmpdir:
-            model_path = download_model(run_cfg, tmpdir)
-            model = Model.from_pretrained(model_path)
+    run_dir = Path(wandb.run.dir)
+    model = Model.from_pretrained(run_dir / "best_model.pt", run_dir / "config" / "model.yaml")
 
-        for split in splits:
-            try:
-                dataloader, spacings = dataset.get_split(split, batch_size=hparams.val_batch_size)
-            except NotImplementedError:
-                print(f"Skipping split '{split}', since it is not available in dataset {dataset.__class__.__name__}.")
-                return
-            else:
-                print(f"Setup of split '{split}' successful.")
+    for split in splits:
+        try:
+            dataloader, spacings = dataset.get_split(split, batch_size=hparams.val_batch_size)
+        except NotImplementedError:
+            print(f"Skipping split '{split}', since it is not available in dataset {dataset.__class__.__name__}.")
+            return
+        else:
+            print(f"Setup of split '{split}' successful.")
 
-            evaluator = Engine(model)
-            ProgressBar(desc=f"Eval({split})", persist=True).attach(evaluator)
-            eos = EpochOutputStore(
-                output_transform=pipe(lambda o: o[:3], get_preds_output_transform, to_cpu_output_transform)
-            )
-            eos.attach(evaluator, "output")
+        evaluator = Engine(model)
+        ProgressBar(desc=f"Eval({split})", persist=True).attach(evaluator)
+        eos = EpochOutputStore(
+            output_transform=pipe(lambda o: o[:3], get_preds_output_transform, to_cpu_output_transform)
+        )
+        eos.attach(evaluator, "output")
 
-            evaluator.run(dataloader)
+        evaluator.run(dataloader)
 
-            preds, targets, _ = prediction_image_plot(evaluator, dataset, split, n_predictions)
-            preds = to_onehot(preds, num_classes=len(dataset.class_labels))
+        preds, targets, _ = prediction_image_plot(evaluator, dataset, split, n_predictions)
+        preds = to_onehot(preds, num_classes=len(dataset.class_labels))
 
-            dice = dice_score(preds, targets, ignore_index=0)
-            sf_dice = surface_dice(preds, targets, spacings, hparams.sf_dice_tolerance, ignore_index=0)
+        dice = dice_score(preds, targets, ignore_index=0)
+        sf_dice = surface_dice(preds, targets, spacings, hparams.sf_dice_tolerance, ignore_index=0)
 
-            for i, (dsc, sf_dsc) in enumerate(zip(dice, sf_dice)):
-                run.summary[f"{split}/dice/{i}"] = dsc
-                run.summary[f"{split}/surface_dice/{i}"] = sf_dsc
+        for i, (dsc, sf_dsc) in enumerate(zip(dice, sf_dice)):
+            wandb.run.summary[f"{split}/dice/{i}"] = dsc
+            wandb.run.summary[f"{split}/surface_dice/{i}"] = sf_dsc
 
 
 def cross_evaluate_unet(
@@ -74,40 +72,37 @@ def cross_evaluate_unet(
     Model: Union[type[VAE], type[UNet]],
     dataset: UDADataset,
     hparams: HParams,
-    run_cfg: RunConfig,
     n_predictions: int = 6,
 ) -> None:
     print()
-    print(f"Cross evaluating run {run_cfg.run_id}\n")
+    print(f"Cross evaluating run\n")
 
-    with wandb.init(project=run_cfg.project, id=run_cfg.run_id, resume=True) as run:
-        with TemporaryDirectory() as tmpdir:
-            model_path = download_model(run_cfg, tmpdir)
-            model = Model.from_pretrained(model_path)
+    run_dir = Path(wandb.run.dir)
+    model = Model.from_pretrained(run_dir / "best_model.pt", run_dir / "config" / "model.yaml")
 
-        for vendor in vendors:
-            dataset.vendor = vendor
-            dataset.setup()
-            dataloader, spacings = dataset.get_split("validation", hparams.val_batch_size)
+    for vendor in vendors:
+        dataset.vendor = vendor
+        dataset.setup()
+        dataloader, spacings = dataset.get_split("validation", hparams.val_batch_size)
 
-            evaluator = Engine(model)
-            ProgressBar(desc=f"Eval({vendor})", persist=True).attach(evaluator)
-            eos = EpochOutputStore(
-                output_transform=pipe(lambda o: o[:3], get_preds_output_transform, to_cpu_output_transform)
-            )
-            eos.attach(evaluator, "output")
+        evaluator = Engine(model)
+        ProgressBar(desc=f"Eval({vendor})", persist=True).attach(evaluator)
+        eos = EpochOutputStore(
+            output_transform=pipe(lambda o: o[:3], get_preds_output_transform, to_cpu_output_transform)
+        )
+        eos.attach(evaluator, "output")
 
-            evaluator.run(dataloader)
+        evaluator.run(dataloader)
 
-            preds, targets, _ = prediction_image_plot(evaluator, dataset, vendor, n_predictions)
-            preds = to_onehot(preds, num_classes=len(dataset.class_labels))
+        preds, targets, _ = prediction_image_plot(evaluator, dataset, vendor, n_predictions)
+        preds = to_onehot(preds, num_classes=len(dataset.class_labels))
 
-            dice = dice_score(preds, targets, ignore_index=0)
-            sf_dice = surface_dice(preds, targets, spacings, hparams.sf_dice_tolerance, ignore_index=0)
+        dice = dice_score(preds, targets, ignore_index=0)
+        sf_dice = surface_dice(preds, targets, spacings, hparams.sf_dice_tolerance, ignore_index=0)
 
-            for i, (dsc, sf_dsc) in enumerate(zip(dice, sf_dice)):
-                run.summary[f"{vendor}/dice/{i}"] = dsc
-                run.summary[f"{vendor}/surface_dice/{i}"] = sf_dsc
+        for i, (dsc, sf_dsc) in enumerate(zip(dice, sf_dice)):
+            wandb.run.summary[f"{vendor}/dice/{i}"] = dsc
+            wandb.run.summary[f"{vendor}/surface_dice/{i}"] = sf_dsc
 
 
 def prediction_image_plot(
