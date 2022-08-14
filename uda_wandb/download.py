@@ -51,6 +51,15 @@ def download_config(run_cfg: RunConfig, path: str = "config", old: bool = False)
         wandb.restore("config/model.yaml", run_cfg.run_path, root=tmpdir, replace=True).close()
         _move_all_files(tmpdir / "config", dest=path)
 
+    import yaml
+    with open(path / "model.yaml", "r") as f:
+        model_cfg = yaml.load(f, Loader=yaml.SafeLoader)
+    if "model_name" in model_cfg.keys():
+        print("Key found")
+        del model_cfg["model_name"]
+    with open(path / "model.yaml", "w") as f:
+        model_cfg = yaml.dump(model_cfg, f)
+
     run_cfg.save(path / "run_config.yaml")
     return path
 

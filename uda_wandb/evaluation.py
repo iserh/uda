@@ -122,7 +122,7 @@ def prediction_image_plot(
 
     preds = torch.cat(preds)
     targets = torch.cat(targets)
-    data = torch.cat(data)
+    data = torch.cat(data).squeeze(1)  # we don't need channel dim
 
     # preds/targets shape: (N, ...) - indices of predicted/gt class
     if dataset.flatten:

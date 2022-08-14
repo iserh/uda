@@ -102,8 +102,8 @@ class CC359(UDADataset):
             train_indices, val_indices = list(kf.split(files))[self.fold]
             X_train, X_val = data[train_indices], data[val_indices]
             y_train, y_val = targets[train_indices], targets[val_indices]
-            self.train_spacings = spacings[train_indices].squeeze()
-            self.val_spacings = spacings[val_indices].squeeze()
+            self.train_spacings = spacings[train_indices].squeeze(1)
+            self.val_spacings = spacings[val_indices].squeeze(1)
         else:
             X_train = X_val = data
             y_train = y_val = targets

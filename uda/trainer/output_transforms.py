@@ -24,8 +24,8 @@ def get_preds_output_transform(output: tuple[torch.Tensor, torch.Tensor]) -> tup
     other = output[2:] if len(output) > 2 else []
 
     if y_pred.shape[1] == 1:
-        preds = y_pred.sigmoid().round().long().squeeze()
-        targets = y_true.long().squeeze()
+        preds = y_pred.sigmoid().round().long().squeeze(1)
+        targets = y_true.long().squeeze(1)
     else:
         preds = y_pred.argmax(1)
         targets = y_true.argmax(1)
