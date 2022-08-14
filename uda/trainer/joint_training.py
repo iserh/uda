@@ -46,8 +46,9 @@ class JointEvaluator(BaseEvaluator):
 class JointTrainer(BaseEvaluator):
     def __init__(
         self,
-        model: UNet,
-        vae: VAE,
+        model: nn.Module,
+        vae: nn.Module,
+        vae_input_size: tuple[int, ...],
         optim: torch.optim.Optimizer,
         schedule: torch.optim.lr_scheduler._LRScheduler,
         loss_fn: nn.Module = nn.BCEWithLogitsLoss,
@@ -71,17 +72,17 @@ class JointTrainer(BaseEvaluator):
 
         # Evaluation on train data
         if train_loader is not None:
-            self.train_evaluator = JointEvaluator(model, vae)
+            self.train_evaluator = JointEvaluator(model, vae, vae_input_size)
             self.add_event_handler(Events.EPOCH_COMPLETED, lambda: self.train_evaluator.run(train_loader))
 
         # Evaluation on validation data
         if pseudo_val_loader is not None:
-            self.pseudo_val_evaluator = JointEvaluator(model, vae)
+            self.pseudo_val_evaluator = JointEvaluator(model, vae, vae_input_size)
             self.add_event_handler(Events.EPOCH_COMPLETED, lambda: self.pseudo_val_evaluator.run(pseudo_val_loader))
 
         # Evaluation on validation data
         if val_loader is not None:
-            self.val_evaluator = JointEvaluator(model, vae)
+            self.val_evaluator = JointEvaluator(model, vae, vae_input_size)
             self.add_event_handler(Events.EPOCH_COMPLETED, lambda: self.val_evaluator.run(val_loader))
 
         # metrics

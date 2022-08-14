@@ -36,6 +36,7 @@ def run(teacher: UNet, vae: VAE, dataset: UDADataset, hparams: HParams, use_wand
     trainer = JointTrainer(
         model=model,
         vae=vae,
+        vae_input_size=vae.config.input_size,
         optim=optim,
         schedule=schedule,
         loss_fn=loss_fn,
