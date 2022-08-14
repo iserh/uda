@@ -10,7 +10,6 @@ from ignite.metrics import ConfusionMatrix, DiceCoefficient, Loss, Metric
 from ignite.utils import convert_tensor
 from torch.utils.data import DataLoader
 
-from ..models import VAE, UNet
 from ..transforms import CenterPad, center_pad
 from .base import BaseEvaluator, dice_score_fn
 from .output_transforms import one_hot_output_transform, pipe
