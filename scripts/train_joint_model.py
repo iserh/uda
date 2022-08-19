@@ -134,7 +134,7 @@ if __name__ == "__main__":
 
         vae = VAE.from_pretrained(vae_path / "best_model.pt")
         teacher = UNet.from_pretrained(teacher_path / "best_model.pt")
-        teacher_ds_cfg = CC359Config.from_file(teacher_path / "dataset.yaml")
+        teacher_ds_cfg = args.dataset(teacher_path / "dataset.yaml").config
 
         with wandb.init(
             project=args.project,
