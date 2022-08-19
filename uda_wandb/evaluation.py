@@ -67,7 +67,7 @@ def evaluate(
             wandb.run.summary[f"{split}/surface_dice/{i}"] = sf_dsc
 
 
-def cross_evaluate_unet(
+def cross_evaluate(
     Engine: type[Engine],
     Model: Union[type[VAE], type[UNet]],
     dataset: UDADataset,

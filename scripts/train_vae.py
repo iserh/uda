@@ -90,7 +90,7 @@ if __name__ == "__main__":
         import wandb
 
         from uda.trainer import VaeEvaluator
-        from uda_wandb import RunConfig, delete_model_binaries, download_dataset, evaluate
+        from uda_wandb import RunConfig, delete_model_binaries, download_dataset, evaluate, cross_evaluate
 
         with wandb.init(
             project=args.project,
@@ -116,6 +116,8 @@ if __name__ == "__main__":
 
             if args.evaluate:
                 evaluate(VaeEvaluator, VAE, dataset, hparams, splits=["validation"])
+            if args.cross_eval:
+                cross_evaluate(VaeEvaluator, VAE, dataset, hparams)
 
         if not args.store:
             delete_model_binaries(run_cfg)

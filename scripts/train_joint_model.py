@@ -114,7 +114,7 @@ if __name__ == "__main__":
         from uda.trainer import SegEvaluator
         from uda_wandb import (
             RunConfig,
-            cross_evaluate_unet,
+            cross_evaluate,
             delete_model_binaries,
             download_dataset,
             download_model,
@@ -165,7 +165,7 @@ if __name__ == "__main__":
             if args.evaluate:
                 evaluate(SegEvaluator, UNet, dataset, hparams, splits=["validation", "testing"])
             if args.cross_eval:
-                cross_evaluate_unet(SegEvaluator, UNet, dataset, hparams)
+                cross_evaluate(SegEvaluator, UNet, dataset, hparams)
 
         if not args.store:
             delete_model_binaries(run_cfg)
