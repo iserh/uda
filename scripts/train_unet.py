@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 from pathlib import Path
 
+from evaluation import prediction_image_plot
 from ignite.contrib.handlers.tqdm_logger import ProgressBar
 from ignite.contrib.handlers.wandb_logger import WandBLogger
 from ignite.engine import Events
@@ -16,7 +17,6 @@ from uda.trainer import (
     segmentation_standard_metrics,
     to_cpu_output_transform,
 )
-from uda_wandb.evaluation import prediction_image_plot
 
 
 def run(dataset: UDADataset, hparams: HParams, model_config: UNetConfig, use_wandb: bool = True) -> None:
@@ -95,9 +95,10 @@ if __name__ == "__main__":
 
     if args.wandb:
         import wandb
+        from evaluation import cross_evaluate, evaluate
 
         from uda.trainer import SegEvaluator
-        from uda_wandb import RunConfig, cross_evaluate, delete_model_binaries, download_dataset, evaluate
+        from wandb_utils import RunConfig, delete_model_binaries, download_dataset
 
         with wandb.init(
             project=args.project,

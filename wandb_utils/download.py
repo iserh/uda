@@ -11,7 +11,7 @@ from torch.nn import BatchNorm1d, BatchNorm2d, BatchNorm3d
 
 from uda.datasets import DatasetType, UDADataset
 from uda.models import VAE, UNet, UNetConfig, VAEConfig
-from uda_wandb.config import RunConfig
+from wandb_utils.config import RunConfig
 
 
 def _move_all_files(src: str, dest: str) -> None:
@@ -52,6 +52,7 @@ def download_config(run_cfg: RunConfig, path: str = "config", old: bool = False)
         _move_all_files(tmpdir / "config", dest=path)
 
     import yaml
+
     with open(path / "model.yaml", "r") as f:
         model_cfg = yaml.load(f, Loader=yaml.SafeLoader)
     if "model_name" in model_cfg.keys():

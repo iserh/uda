@@ -1,6 +1,5 @@
 """Evaluation functions for wandb."""
 from pathlib import Path
-from tempfile import TemporaryDirectory
 from typing import Union
 
 import numpy as np
@@ -17,9 +16,6 @@ from uda.datasets import UDADataset
 from uda.metrics import dice_score, surface_dice
 from uda.models import VAE, UNet
 from uda.trainer import get_preds_output_transform, pipe, to_cpu_output_transform
-from uda_wandb.config import RunConfig
-
-from .download import download_model
 
 vendors = ["GE_15", "GE_3", "SIEMENS_15", "SIEMENS_3", "PHILIPS_15", "PHILIPS_3"]
 
@@ -33,7 +29,7 @@ def evaluate(
     n_predictions: int = 6,
 ) -> None:
     print()
-    print(f"Evaluating run\n")
+    print("Evaluating run\n")
 
     run_dir = Path(wandb.run.dir)
     model = Model.from_pretrained(run_dir / "best_model.pt", run_dir / "config" / "model.yaml")
@@ -75,12 +71,12 @@ def cross_evaluate(
     n_predictions: int = 6,
 ) -> None:
     print()
-    print(f"Cross evaluating run\n")
+    print("Cross evaluating run\n")
 
     run_dir = Path(wandb.run.dir)
     model = Model.from_pretrained(run_dir / "best_model.pt", run_dir / "config" / "model.yaml")
 
-    for vendor in vendors:
+    for vendor in dataset.vendors:
         dataset.vendor = vendor
         dataset.setup()
         dataloader, spacings = dataset.get_split("validation", hparams.val_batch_size)

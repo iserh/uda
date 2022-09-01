@@ -10,7 +10,7 @@ from surface_distance import compute_surface_dice_at_tolerance, compute_surface_
 
 def remove_idx(t: torch.Tensor, idx: int, dim: int) -> torch.Tensor:
     assert idx < t.shape[dim]
-    indices = torch.LongTensor(list(chain(range(idx), range(idx + 1, t.shape[dim]))))
+    indices = torch.LongTensor(list(chain(range(idx), range(idx + 1, t.shape[dim])))).to(t.device)
     return torch.index_select(t, dim, indices)
 
 

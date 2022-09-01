@@ -7,7 +7,7 @@ Simply run
 pip install .
 ```
 
-If you want to use the `uda_wandb` integrations please install with extra (double quotes only needed in `zsh`):
+If you want to use the `wandb_utils` integrations please install with extra (double quotes only needed in `zsh`):
 ```sh
 pip install ".[wandb]"
 ```

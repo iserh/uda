@@ -8,8 +8,9 @@ import torch
 from ignite.utils import to_onehot
 from nibabel.spatialimages import SpatialImage
 from pypatchify.pt import pt
+from sklearn.model_selection import KFold
 from sklearn.preprocessing import MinMaxScaler
-from torch.utils.data import ConcatDataset, DataLoader, TensorDataset
+from torch.utils.data import DataLoader, TensorDataset
 from tqdm import tqdm
 
 from ..transforms import center_pad
@@ -27,6 +28,7 @@ class MAndMs(UDADataset):
 
     artifact_name = "iserh/UDA-Datasets/MAndMs:latest"
     class_labels = {0: "Background", 1: "left ventricle (LV)", 2: "myocardium (MYO)", 3: "right ventricle (RV)"}
+    vendors = ["Canon", "GE", "Philips", "Siemens"]
 
     def __init__(self, config: Union[MAndMsConfig, str], root: str = "/tmp/data") -> None:
         if not isinstance(config, MAndMsConfig):
@@ -36,24 +38,20 @@ class MAndMs(UDADataset):
         self.config = config
 
         phases_dict = {"ED": 0, "ES": 1}
+        self.vendor = config.vendor
+        self.fold = config.fold
         self.selected_phases = [phases_dict[p] for p in config.phases]
-        self.unlabeled = config.unlabeled
         self.flatten = config.flatten
         self.imsize = config.imsize
-        self.offset = config.offset
         self.patch_size = config.patch_size
         self.clip_intensities = config.clip_intensities
         self.limit = config.limit
+        self.random_state = config.random_state
 
     def setup(self) -> None:
         """Load data from disk and preprocess."""
-        self.train_split, self.train_spacings = self._load_files(self.root / "Training" / "Labeled")
-        if self.unlabeled:
-            unlabeled_split, unlabeled_spacings = self._load_files(self.root / "Training" / "Unlabeled")
-            self.train_split = ConcatDataset([self.train_split, unlabeled_split])
-            self.train_spacings = torch.cat([self.train_spacings, unlabeled_spacings])
-        self.val_split, self.val_spacings = self._load_files(self.root / "Validation")
-        self.test_split, self.test_spacings = self._load_files(self.root / "Testing")
+        self._load_train_val_files()
+        self._load_test_files()
 
     def train_dataloader(self, batch_size: Optional[int] = None) -> DataLoader:
         batch_size = batch_size or len(self.train_split)
@@ -77,7 +75,44 @@ class MAndMs(UDADataset):
         else:
             raise NotImplementedError
 
-    def _load_files(self, directory: Path) -> tuple[TensorDataset, torch.Tensor]:
+    def _load_train_val_files(self) -> None:
+        data, targets, spacings = self._load_files(self.root / self.vendor / "Training")
+
+        if self.fold is not None:
+            # split data & targets into train/val
+            kf = KFold(n_splits=3, shuffle=True, random_state=self.random_state)
+            train_indices, val_indices = list(kf.split(data))[self.fold]
+            X_train, X_val = data[train_indices], data[val_indices]
+            y_train, y_val = targets[train_indices], targets[val_indices]
+            self.train_spacings = spacings[train_indices].squeeze(1)
+            self.val_spacings = spacings[val_indices].squeeze(1)
+        else:
+            X_train = X_val = data
+            y_train = y_val = targets
+
+        # collapse batch_dim and flatten_dim/patch_dim; unsqueeze for channel dim
+        X_train = pt.collapse_dims(X_train, dims=(0, 1)).unsqueeze(1)
+        X_val = pt.collapse_dims(X_val, dims=(0, 1)).unsqueeze(1)
+        y_train = pt.collapse_dims(y_train, dims=(0, 1))
+        y_train = to_onehot(y_train.long(), num_classes=4).float()
+        y_val = pt.collapse_dims(y_val, dims=(0, 1))
+        y_val = to_onehot(y_val.long(), num_classes=4).float()
+
+        self.train_split = TensorDataset(X_train, y_train)
+        self.val_split = TensorDataset(X_val, y_val)
+
+    def _load_test_files(self) -> None:
+        data, targets, spacings = self._load_files(self.root / self.vendor / "Testing")
+
+        # collapse batch_dim and flatten_dim/patch_dim; unsqueeze for channel dim
+        data = pt.collapse_dims(data, dims=(0, 1)).unsqueeze(1)
+        targets = pt.collapse_dims(targets, dims=(0, 1))
+        targets = to_onehot(targets.long(), num_classes=4).float()
+
+        self.test_split = TensorDataset(data, targets)
+        self.test_spacings = spacings
+
+    def _load_files(self, directory: Path) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         items = sorted(list(directory.iterdir()))
         if self.limit is not None:
             items = items[: self.limit]
@@ -126,30 +161,23 @@ class MAndMs(UDADataset):
             spacing = torch.from_numpy(spacing)
 
             # pad & crop
-            img = center_pad(img, self.imsize, self.offset)
-            mask = center_pad(mask, self.imsize, self.offset)
+            img = center_pad(img, self.imsize)
+            mask = center_pad(mask, self.imsize)
 
             images.extend(img)
             masks.extend(mask)
             spacings.extend(spacing)
 
-        data = torch.stack(images)
-        targets = torch.stack(masks)
-        spacings = torch.stack(spacings)
+        data = torch.stack(images).unsqueeze(1)
+        targets = torch.stack(masks).unsqueeze(1)
+        spacings = torch.stack(spacings).unsqueeze(1)
 
         if self.patch_size is not None:
-            # sadly patchify only works with numpy arrays
-            data = pt.patchify_to_batches(data, self.patch_size, batch_dim=0)
-            targets = pt.patchify_to_batches(targets, self.patch_size, batch_dim=0)
+            data = pt.patchify_to_batches(data, self.patch_size, batch_dim=1)
+            targets = pt.patchify_to_batches(targets, self.patch_size, batch_dim=1)
 
-        # optional flatten & add channel dim
         if self.flatten:
-            # transpose z_dim next to batch_dim
-            data = pt.collapse_dims(data, dims=(0, data.ndim - 3))
-            targets = pt.collapse_dims(targets, dims=(0, targets.ndim - 3))
+            data = pt.collapse_dims(data, dims=(1, data.ndim - 3), target_dim=1)
+            targets = pt.collapse_dims(targets, dims=(1, targets.ndim - 3), target_dim=1)
 
-        # add channel dim
-        data = data.unsqueeze(1)
-        targets = to_onehot(targets.long(), num_classes=4).float()
-
-        return TensorDataset(data, targets), spacings
+        return data, targets, spacings

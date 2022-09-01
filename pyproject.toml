@@ -8,7 +8,7 @@ show_missing = true
 [tool.coverage.run]
 branch = true
 omit = ["**/__init__.py"]
-source = ["uda", "uda_wandb"]
+source = ["uda", "wandb_utils"]
 
 [tool.isort]
 ensure_newline_before_comments = true

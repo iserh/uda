@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 from pathlib import Path
 
+from evaluation import prediction_image_plot
 from ignite.contrib.handlers.tqdm_logger import ProgressBar
 from ignite.contrib.handlers.wandb_logger import WandBLogger
 from ignite.engine import Events
@@ -10,7 +11,6 @@ from uda import HParams, get_loss_cls, get_optimizer_cls
 from uda.datasets import UDADataset
 from uda.models import VAE, VAEConfig
 from uda.trainer import VaeTrainer, get_preds_output_transform, pipe, to_cpu_output_transform, vae_standard_metrics
-from uda_wandb import prediction_image_plot
 
 
 def run(dataset: UDADataset, hparams: HParams, model_config: VAEConfig, use_wandb: bool = False) -> None:
@@ -88,9 +88,10 @@ if __name__ == "__main__":
 
     if args.wandb:
         import wandb
+        from evaluation import cross_evaluate, evaluate
 
         from uda.trainer import VaeEvaluator
-        from uda_wandb import RunConfig, delete_model_binaries, download_dataset, evaluate, cross_evaluate
+        from wandb_utils import RunConfig, delete_model_binaries, download_dataset
 
         with wandb.init(
             project=args.project,

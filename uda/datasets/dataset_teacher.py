@@ -18,6 +18,7 @@ class TeacherData:
         """
         self.model = model
         self.dataset = dataset
+        self.vendors = dataset.vendors
 
     def setup(self, batch_size: int = 2) -> None:
         self.dataset.setup()

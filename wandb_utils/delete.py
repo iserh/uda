@@ -1,6 +1,6 @@
 import wandb
 
-from uda_wandb.config import RunConfig
+from wandb_utils.config import RunConfig
 
 
 def delete_model_binaries(run_cfg: RunConfig) -> None:

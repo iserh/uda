@@ -21,7 +21,7 @@ setup(
     author="Henri Iser",
     author_email="iserhenri@gmail.com",
     url="https://github.com/iserh/uda/tree/main",
-    packages=find_packages(include=["uda*", "uda_wandb*", "surface_distance*"]),
+    packages=find_packages(include=["uda*", "wandb_utils*", "surface_distance*"]),
     extras_require=extras,
     install_requires=deps,
     classifiers=[
