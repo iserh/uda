@@ -129,14 +129,19 @@ def prediction_image_plot(
     slice_index = dataset.imsize[0] // 2
     class_labels = {k: v for k, v in dataset.class_labels.items() if v != "Background"}
 
-    for i in range(min(n_predictions, preds.shape[0])):
-        wandb_img = wandb.Image(
+    images = [
+        wandb.Image(
             data[i][slice_index].numpy(),
             masks={
                 "prediction": {"mask_data": preds[i][slice_index].numpy(), "class_labels": class_labels},
                 "ground truth": {"mask_data": targets[i][slice_index].numpy(), "class_labels": class_labels},
             },
         )
-        wandb.log({f"{name}/predictions/{i}": wandb_img}, commit=False)
+        for i in range(min(n_predictions, preds.shape[0]))
+    ]
+
+    wandb.log({
+        f"{name}/predictions/{i}": img for i, img in enumerate(images)
+    })
 
     return preds, targets, data

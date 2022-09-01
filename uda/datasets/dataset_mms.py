@@ -84,8 +84,8 @@ class MAndMs(UDADataset):
             train_indices, val_indices = list(kf.split(data))[self.fold]
             X_train, X_val = data[train_indices], data[val_indices]
             y_train, y_val = targets[train_indices], targets[val_indices]
-            self.train_spacings = spacings[train_indices].squeeze(1)
-            self.val_spacings = spacings[val_indices].squeeze(1)
+            self.train_spacings = spacings[train_indices]
+            self.val_spacings = spacings[val_indices]
         else:
             X_train = X_val = data
             y_train = y_val = targets
@@ -170,7 +170,7 @@ class MAndMs(UDADataset):
 
         data = torch.stack(images).unsqueeze(1)
         targets = torch.stack(masks).unsqueeze(1)
-        spacings = torch.stack(spacings).unsqueeze(1)
+        spacings = torch.stack(spacings)
 
         if self.patch_size is not None:
             data = pt.patchify_to_batches(data, self.patch_size, batch_dim=1)

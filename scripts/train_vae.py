@@ -116,7 +116,7 @@ if __name__ == "__main__":
             run(dataset, hparams, model_config, use_wandb=True)
 
             if args.evaluate:
-                evaluate(VaeEvaluator, VAE, dataset, hparams, splits=["validation"])
+                evaluate(VaeEvaluator, VAE, dataset, hparams, splits=["validation", "testing"])
             if args.cross_eval:
                 cross_evaluate(VaeEvaluator, VAE, dataset, hparams)
 
