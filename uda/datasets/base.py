@@ -43,3 +43,10 @@ class UDADataset(ABC):
     @abstractmethod
     def get_split(self, split: str, batch_size: Optional[int] = None) -> tuple[DataLoader, torch.Tensor]:
         ...
+
+    def has_split(self, split: str) -> bool:
+        try:
+            self.get_split(split)
+            return True
+        except NotImplementedError:
+            return False

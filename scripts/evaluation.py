@@ -79,7 +79,9 @@ def cross_evaluate(
     for vendor in dataset.vendors:
         dataset.vendor = vendor
         dataset.setup()
-        dataloader, spacings = dataset.get_split("validation", hparams.val_batch_size)
+
+        split = "testing" if dataset.has_split("testing") else "validation"
+        dataloader, spacings = dataset.get_split(split, hparams.val_batch_size)
 
         evaluator = Engine(model)
         ProgressBar(desc=f"Eval({vendor})", persist=True).attach(evaluator)
@@ -140,8 +142,6 @@ def prediction_image_plot(
         for i in range(min(n_predictions, preds.shape[0]))
     ]
 
-    wandb.log({
-        f"{name}/predictions/{i}": img for i, img in enumerate(images)
-    })
+    wandb.log({f"{name}/predictions/{i}": img for i, img in enumerate(images)})
 
     return preds, targets, data
