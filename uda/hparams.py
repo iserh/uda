@@ -14,6 +14,8 @@ def get_loss_cls(name: str) -> type[torch.nn.Module]:
         return DiceBCEWithLogitsLoss
     elif name == "BCE":
         return torch.nn.BCEWithLogitsLoss
+    elif name == "CE":
+        return torch.nn.CrossEntropyLoss
     elif name == "MSE":
         return MSEWithLogitsLoss
     else:

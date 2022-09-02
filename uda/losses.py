@@ -25,7 +25,12 @@ class DiceWithLogitsLoss(nn.Module):
 
         dsc = dice_score(y_pred, y_true, self.ignore_index, self.smooth)
 
-        return (1 - dsc.mean()) if self.reduction == "mean" else (1 - dsc)
+        if self.reduction == "mean":
+            return (1 - dsc).mean()
+        elif self.reduction == "sum":
+            return (1 - dsc).sum()
+        else:
+            raise NotImplementedError
 
 
 class DiceBCEWithLogitsLoss(nn.Module):
