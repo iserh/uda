@@ -69,7 +69,7 @@ def run(teacher: UNet, vae: VAE, dataset: UDADataset, hparams: HParams, use_wand
         )
         # wandb table evaluation
         trainer.add_event_handler(
-            event_name=Events.EPOCH_COMPLETED,
+            event_name=Events.EPOCH_COMPLETED(every=hparams.epochs // 10),
             handler=prediction_image_plot,
             evaluator=trainer.val_evaluator,
             dataset=dataset,
