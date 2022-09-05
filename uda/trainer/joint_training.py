@@ -33,6 +33,7 @@ class JointEvaluator(BaseEvaluator):
 
         y_vae = self.vae_cropping(y_pred)
         y_rec, _, _ = self.vae(y_vae)
+        y_rec = indices_from_prediction(y_rec)
 
         y_true = center_pad(y_true, y_pred.shape[2:])
         y_vae = center_pad(y_vae, y_rec.shape[2:])
@@ -43,7 +44,7 @@ class JointEvaluator(BaseEvaluator):
 
 
 class JointTrainer(BaseEvaluator):
-    def __init__(
+    def __init__(  # noqa: C901 - too complex
         self,
         model: nn.Module,
         vae: nn.Module,
@@ -55,6 +56,7 @@ class JointTrainer(BaseEvaluator):
         train_loader: Optional[DataLoader] = None,
         pseudo_val_loader: Optional[DataLoader] = None,
         val_loader: Optional[DataLoader] = None,
+        test_loader: Optional[DataLoader] = None,
         patience: Optional[int] = None,
         metrics: Optional[dict[str, Metric]] = None,
         score_function: Optional[Callable[[Engine], float]] = dice_score_fn,
@@ -84,6 +86,11 @@ class JointTrainer(BaseEvaluator):
             self.val_evaluator = JointEvaluator(model, vae, vae_input_size)
             self.add_event_handler(Events.EPOCH_COMPLETED, lambda: self.val_evaluator.run(val_loader))
 
+        # Evaluation on testing data
+        if test_loader is not None:
+            self.test_evaluator = JointEvaluator(model, vae, vae_input_size)
+            self.add_event_handler(Events.EPOCH_COMPLETED, lambda: self.test_evaluator.run(test_loader))
+
         # metrics
         self.metrics = metrics if metrics != {} else None
         if metrics is not None:
@@ -94,6 +101,8 @@ class JointTrainer(BaseEvaluator):
                     metric.attach(self.pseudo_val_evaluator, name)
                 if val_loader is not None:
                     metric.attach(self.val_evaluator, name)
+                if test_loader is not None:
+                    metric.attach(self.test_evaluator, name)
 
         # checkpointing
         if metrics is not None and score_function is not None and val_loader is not None:
@@ -126,6 +135,7 @@ class JointTrainer(BaseEvaluator):
         with torch.no_grad():
             y_vae = self.vae_cropping(y_pred)
             y_rec, _, _ = self.vae(y_vae)
+            y_rec = indices_from_prediction(y_rec)
 
         y_true = center_pad(y_true, y_pred.shape[2:])
         y_vae = center_pad(y_vae, y_rec.shape[2:])
@@ -139,6 +149,13 @@ class JointTrainer(BaseEvaluator):
         self.schedule.step()
 
         return pseudo_loss, rec_loss
+
+
+def indices_from_prediction(t: torch.FloatTensor) -> torch.LongTensor:
+    if t.shape[1] == 1:
+        return t.sigmoid().round().long().squeeze(1)
+    else:
+        return t.argmax(1)
 
 
 def joint_standard_metrics(loss_fn: nn.Module, num_classes: int, lambd: float) -> dict[str, Metric]:

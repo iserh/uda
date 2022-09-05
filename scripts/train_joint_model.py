@@ -25,6 +25,7 @@ def run(teacher: UNet, vae: VAE, dataset: UDADataset, hparams: HParams, use_wand
     train_loader = teacher_data.train_dataloader(hparams.val_batch_size)
     val_loader = teacher_data.val_dataloader(hparams.val_batch_size)  # pseudo labels
     true_val_loader = dataset.val_dataloader(hparams.val_batch_size)  # real labels
+    test_loader = dataset.test_dataloader(hparams.val_batch_size)
 
     model = UNet(teacher.config)
     model.load_state_dict(teacher.state_dict())  # copy weights
@@ -44,6 +45,7 @@ def run(teacher: UNet, vae: VAE, dataset: UDADataset, hparams: HParams, use_wand
         train_loader=train_loader,
         pseudo_val_loader=val_loader,  # pseudo labels
         val_loader=true_val_loader,  # real labels
+        test_loader=test_loader,
         patience=hparams.early_stopping_patience,
         metrics=joint_standard_metrics(loss_fn, len(dataset.class_labels), hparams.vae_lambd),
         cache_dir=wandb.run.dir if use_wandb else "/tmp/models/student",
@@ -53,6 +55,7 @@ def run(teacher: UNet, vae: VAE, dataset: UDADataset, hparams: HParams, use_wand
     ProgressBar(desc="Train(Eval)", persist=True).attach(trainer.train_evaluator)
     ProgressBar(desc="Val(Pseudo)", persist=True).attach(trainer.pseudo_val_evaluator)
     ProgressBar(desc="Val", persist=True).attach(trainer.val_evaluator)
+    ProgressBar(desc="Test", persist=True).attach(trainer.test_evaluator)
 
     if use_wandb:
         # log model size
@@ -85,6 +88,7 @@ def run(teacher: UNet, vae: VAE, dataset: UDADataset, hparams: HParams, use_wand
             ("training", trainer.train_evaluator),
             ("pseudo_validation", trainer.pseudo_val_evaluator),
             ("validation", trainer.val_evaluator),
+            ("testing", trainer.test_evaluator),
         ]:
             wandb_logger.attach_output_handler(
                 evaluator,
