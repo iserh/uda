@@ -107,16 +107,25 @@ def run(teacher: UNet, vae: VAE, dataset: UDADataset, hparams: HParams, use_wand
 
 
 if __name__ == "__main__":
-    from commons import get_launch_config, get_model
+    from commons import get_launch_config, get_model_path
 
     launch = get_launch_config()
 
     # load configuration
     hparams = HParams.from_file(launch.config_dir / "hparams.yaml")
     dataset: UDADataset = launch.dataset(launch.config_dir / "dataset.yaml", root=launch.data_root)
+    # information about teacher / vae
+    vae_path = get_model_path(launch.vae, launch.download_model)
+    teacher_path = get_model_path(launch.teacher, launch.download_model)
+    if launch.wandb:
+        from wandb_utils import RunConfig
+
+        vae_run = RunConfig.from_file(vae_path / "run_config.yaml")
+        teacher_run = RunConfig.from_file(teacher_path / "run_config.yaml")
+        teacher_dataset = launch.dataset(teacher_path / "dataset.yaml")
     # load models
-    vae, vae_path = get_model(launch.vae, launch.download_model, model_cls=VAE)
-    teacher, teacher_path = get_model(launch.teacher, launch.download_model, model_cls=UNet)
+    vae = VAE.from_pretrained(vae_path / "best_model.pt")
+    teacher = VAE.from_pretrained(teacher_path / "best_model.pt")
 
     # finetune on all given vendors
     for vendor in launch.vendors:
@@ -128,11 +137,7 @@ if __name__ == "__main__":
             from evaluation import evaluate, evaluate_vendors
 
             from uda.trainer import SegEvaluator
-            from wandb_utils import RunConfig, delete_model_binaries, download_dataset
-
-            vae_run = RunConfig.from_file(vae_path / "run_config.yaml")
-            teacher_run = RunConfig.from_file(teacher_path / "run_config.yaml")
-            teacher_dataset = launch.dataset(teacher_path / "dataset.yaml")
+            from wandb_utils import delete_model_binaries, download_dataset
 
             with wandb.init(
                 project=launch.project,

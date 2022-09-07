@@ -1,11 +1,10 @@
 from argparse import ArgumentParser
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional, Union
+from typing import Optional
 
 from uda import Config
 from uda.datasets import DatasetType
-from uda.models import VAE, UNet
 from wandb_utils import RunConfig, download_model
 
 
@@ -33,14 +32,12 @@ class LaunchConfig(Config):
         self.config_dir = Path(self.config_dir)
 
 
-def get_model(path: str, download: bool, model_cls: Union[type[UNet], type[VAE]]) -> tuple[Union[UNet, VAE], Path]:
+def get_model_path(path: str, download: bool) -> Path:
     if download:
         run: RunConfig = RunConfig.parse_path(path)
-        model_dir_path = download_model(run, path=f"/tmp/models/{run.run_id}").parent
-        return model_cls.from_pretrained(model_dir_path / "best_model.pt"), model_dir_path
+        return download_model(run, path=f"/tmp/models/{run.run_id}").parent
     else:
-        model_dir_path = Path(path)
-        return model_cls.from_pretrained(model_dir_path / "best_model.pt"), model_dir_path
+        return Path(path)
 
 
 def get_launch_config() -> LaunchConfig:
