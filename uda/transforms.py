@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+from ignite.utils import to_onehot
 
 
 class CenterPad(nn.Module):
@@ -43,3 +44,11 @@ def center_pad(
     pad = torch.stack([excess.floor(), excess.ceil()], dim=0).long() + offset
 
     return torch.nn.functional.pad(x, tuple(pad.T.flatten()), mode, value)
+
+
+def binarize_prediction(t: torch.FloatTensor) -> torch.LongTensor:
+    num_classes = t.shape[1]
+    if num_classes == 1:  # binary segmentation
+        return t.sigmoid().round()
+    else:
+        return to_onehot(t.argmax(1), num_classes).float()

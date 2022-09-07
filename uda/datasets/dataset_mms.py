@@ -53,17 +53,17 @@ class MAndMs(UDADataset):
         self._load_train_val_files()
         self._load_test_files()
 
-    def train_dataloader(self, batch_size: Optional[int] = None) -> DataLoader:
+    def train_dataloader(self, batch_size: Optional[int] = None, shuffle: bool = True) -> DataLoader:
         batch_size = batch_size or len(self.train_split)
-        return DataLoader(self.train_split, batch_size=batch_size, shuffle=True)
+        return DataLoader(self.train_split, batch_size=batch_size, shuffle=shuffle)
 
-    def val_dataloader(self, batch_size: Optional[int] = None) -> DataLoader:
+    def val_dataloader(self, batch_size: Optional[int] = None, shuffle: bool = False) -> DataLoader:
         batch_size = batch_size or len(self.val_split)
-        return DataLoader(self.val_split, batch_size=batch_size, shuffle=False)
+        return DataLoader(self.val_split, batch_size=batch_size, shuffle=shuffle)
 
-    def test_dataloader(self, batch_size: Optional[int] = None) -> DataLoader:
+    def test_dataloader(self, batch_size: Optional[int] = None, shuffle: bool = False) -> DataLoader:
         batch_size = batch_size or len(self.test_split)
-        return DataLoader(self.test_split, batch_size=batch_size, shuffle=False)
+        return DataLoader(self.test_split, batch_size=batch_size, shuffle=shuffle)
 
     def get_split(self, split: str, batch_size: Optional[int] = None) -> tuple[DataLoader, torch.Tensor]:
         if split == "training":

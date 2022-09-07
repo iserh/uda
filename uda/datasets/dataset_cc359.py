@@ -118,15 +118,15 @@ class CC359(UDADataset):
         self.train_split = TensorDataset(X_train, y_train)
         self.val_split = TensorDataset(X_val, y_val)
 
-    def train_dataloader(self, batch_size: Optional[int] = None) -> DataLoader:
+    def train_dataloader(self, batch_size: Optional[int] = None, shuffle: bool = True) -> DataLoader:
         batch_size = batch_size or len(self.train_split)
-        return DataLoader(self.train_split, batch_size=batch_size, shuffle=True)
+        return DataLoader(self.train_split, batch_size=batch_size, shuffle=shuffle)
 
-    def val_dataloader(self, batch_size: Optional[int] = None) -> DataLoader:
+    def val_dataloader(self, batch_size: Optional[int] = None, shuffle: bool = False) -> DataLoader:
         batch_size = batch_size or len(self.val_split)
-        return DataLoader(self.val_split, batch_size=batch_size, shuffle=False)
+        return DataLoader(self.val_split, batch_size=batch_size, shuffle=shuffle)
 
-    def test_dataloader(self, batch_size: Optional[int] = None) -> NotImplementedError:
+    def test_dataloader(self, batch_size: Optional[int] = None, shuffle: bool = False) -> NotImplementedError:
         raise NotImplementedError
 
     def get_split(self, split: str, batch_size: Optional[int] = None) -> tuple[DataLoader, torch.Tensor]:

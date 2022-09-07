@@ -58,8 +58,11 @@ def download_config(run_cfg: RunConfig, path: str = "config", old: bool = False)
     with open(path / "model.yaml", "r") as f:
         model_cfg = yaml.load(f, Loader=yaml.SafeLoader)
     if "model_name" in model_cfg.keys():
-        print("Key found")
+        print("model_name found")
         del model_cfg["model_name"]
+    if "track_running_stats" in model_cfg.keys():
+        print("track_running_stats found")
+        del model_cfg["track_running_stats"]
     with open(path / "model.yaml", "w") as f:
         model_cfg = yaml.dump(model_cfg, f)
 

@@ -30,15 +30,15 @@ class UDADataset(ABC):
         ...
 
     @abstractmethod
-    def train_dataloader(self, batch_size: Optional[int] = None) -> DataLoader:
+    def train_dataloader(self, batch_size: Optional[int] = None, shuffle: bool = True) -> DataLoader:
         ...
 
     @abstractmethod
-    def val_dataloader(self, batch_size: Optional[int] = None) -> DataLoader:
+    def val_dataloader(self, batch_size: Optional[int] = None, shuffle: bool = False) -> DataLoader:
         ...
 
     @abstractmethod
-    def test_dataloader(self, batch_size: Optional[int] = None) -> DataLoader:
+    def test_dataloader(self, batch_size: Optional[int] = None, shuffle: bool = False) -> DataLoader:
         ...
 
     @abstractmethod

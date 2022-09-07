@@ -7,10 +7,10 @@ import torch.nn as nn
 from ignite.engine import Engine, Events
 from ignite.handlers import EarlyStopping, ModelCheckpoint
 from ignite.metrics import ConfusionMatrix, DiceCoefficient, Loss, Metric
-from ignite.utils import convert_tensor, to_onehot
+from ignite.utils import convert_tensor
 from torch.utils.data import DataLoader
 
-from ..transforms import CenterPad, center_pad
+from ..transforms import CenterPad, center_pad, binarize_prediction
 from .base import BaseEvaluator, dice_score_fn
 from .output_transforms import one_hot_output_transform, pipe
 
@@ -149,14 +149,6 @@ class JointTrainer(BaseEvaluator):
         self.schedule.step()
 
         return pseudo_loss, rec_loss
-
-
-def binarize_prediction(t: torch.FloatTensor) -> torch.LongTensor:
-    num_classes = t.shape[1]
-    if num_classes == 1:  # binary segmentation
-        return t.sigmoid().round()
-    else:
-        return to_onehot(t.argmax(1), num_classes).float()
 
 
 def joint_standard_metrics(loss_fn: nn.Module, num_classes: int, lambd: float) -> dict[str, Metric]:

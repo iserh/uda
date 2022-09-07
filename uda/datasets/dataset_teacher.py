@@ -6,6 +6,7 @@ from torch.utils.data import DataLoader, TensorDataset
 from tqdm import tqdm
 
 from .base import UDADataset
+from ..transforms import binarize_prediction
 
 
 class TeacherData:
@@ -23,8 +24,8 @@ class TeacherData:
     def setup(self, batch_size: int = 2) -> None:
         self.dataset.setup()
 
-        y_train = self.get_teacher_labels(self.dataset.train_dataloader(batch_size))
-        y_val = self.get_teacher_labels(self.dataset.val_dataloader(batch_size))
+        y_train = self.get_teacher_labels(self.dataset.train_dataloader(batch_size, shuffle=False))
+        y_val = self.get_teacher_labels(self.dataset.val_dataloader(batch_size, shuffle=False))
 
         self.train_split = TensorDataset(self.dataset.train_split.tensors[0], y_train)
         self.val_split = TensorDataset(self.dataset.val_split.tensors[0], y_val)
@@ -34,7 +35,7 @@ class TeacherData:
         self.model.to(idist.device()).eval()
         preds = torch.cat(
             [
-                self.model(x.to(idist.device())).sigmoid().round().cpu()
+                binarize_prediction(self.model(x.to(idist.device()))).cpu()
                 for x, _ in tqdm(dataloader, desc="Predicting Pseudo labels")
             ]
         )
