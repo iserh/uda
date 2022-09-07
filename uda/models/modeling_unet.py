@@ -20,12 +20,11 @@ class UNetEncoder(nn.Module):
         blocks: tuple[tuple[int, ...]],
         use_pooling: bool = False,
         batch_norm: bool = True,
-        track_running_stats: bool = False,
     ) -> None:
         super(UNetEncoder, self).__init__()
-        self.in_block = ConvBlock(dim, blocks[0], batch_norm, track_running_stats)
+        self.in_block = ConvBlock(dim, blocks[0], batch_norm)
         self.downsample_blocks = nn.ModuleList(
-            [DownsampleBlock(dim, channels, use_pooling, batch_norm, track_running_stats) for channels in blocks[1:]]
+            [DownsampleBlock(dim, channels, use_pooling, batch_norm) for channels in blocks[1:]]
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -48,12 +47,11 @@ class UNetDecoder(nn.Module):
         out_channels: int,
         blocks: tuple[tuple[int, ...]],
         batch_norm: bool = True,
-        track_running_stats: bool = False,
         concat_hidden: bool = False,
     ) -> None:
         super(UNetDecoder, self).__init__()
         self.upsample_blocks = nn.ModuleList(
-            [UpsampleBlock(dim, channels, batch_norm, track_running_stats, concat_hidden) for channels in blocks]
+            [UpsampleBlock(dim, channels, batch_norm, concat_hidden) for channels in blocks]
         )
         self.out_block = ConvNd(
             dim=dim,
@@ -88,14 +86,13 @@ class UNet(nn.Module):
         self.config = config
 
         self.encoder = UNetEncoder(
-            config.dim, config.encoder_blocks, config.use_pooling, config.batch_norm, config.track_running_stats
+            config.dim, config.encoder_blocks, config.use_pooling, config.batch_norm
         )
         self.decoder = UNetDecoder(
             config.dim,
             config.out_channels,
             config.decoder_blocks,
             config.batch_norm,
-            config.track_running_stats,
             config.concat_hidden,
         )
 

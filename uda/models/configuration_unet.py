@@ -15,4 +15,3 @@ class UNetConfig(Config):
     concat_hidden: bool = False
     use_pooling: bool = False
     batch_norm: bool = False
-    track_running_stats: bool = True

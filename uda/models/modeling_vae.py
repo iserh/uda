@@ -36,15 +36,14 @@ class VAEEncoder(nn.Module):
         blocks: tuple[tuple[int, ...]],
         use_pooling: bool = False,
         batch_norm: bool = True,
-        track_running_stats: bool = False,
     ) -> None:
         super(VAEEncoder, self).__init__()
         # hidden_size = [ #channels , *img_sizes_after_final_downsampling ]
         hidden_size = [blocks[-1][-1]] + compute_hidden_size(len(blocks[1:]), input_size)
 
-        self.in_block = ConvBlock(dim, blocks[0], batch_norm, track_running_stats)
+        self.in_block = ConvBlock(dim, blocks[0], batch_norm)
         self.downsample_blocks = nn.Sequential(
-            *[DownsampleBlock(dim, channels, use_pooling, batch_norm, track_running_stats) for channels in blocks[1:]]
+            *[DownsampleBlock(dim, channels, use_pooling, batch_norm) for channels in blocks[1:]]
         )
         self.mean = nn.Linear(np.prod(hidden_size), latent_dim)
         self.variance_log = nn.Linear(np.prod(hidden_size), latent_dim)
@@ -71,7 +70,6 @@ class VAEDecoder(nn.Module):
         latent_dim: int,
         blocks: tuple[tuple[int, ...]],
         batch_norm: bool = True,
-        track_running_stats: bool = False,
     ) -> None:
         super(VAEDecoder, self).__init__()
         # hidden_size = [ #channels , *img_sizes_after_final_upsampling ]
@@ -79,7 +77,7 @@ class VAEDecoder(nn.Module):
 
         self.linear = nn.Linear(latent_dim, np.prod(self.hidden_size))
         self.upsample_blocks = nn.Sequential(
-            *[UpsampleBlock(dim, channels, batch_norm, track_running_stats) for channels in blocks]
+            *[UpsampleBlock(dim, channels, batch_norm) for channels in blocks]
         )
         self.out_block = ConvNd(
             dim=dim,
@@ -111,7 +109,6 @@ class VAE(nn.Module):
             config.encoder_blocks,
             config.use_pooling,
             config.batch_norm,
-            config.track_running_stats,
         )
         self.decoder = VAEDecoder(
             config.dim,
@@ -120,7 +117,6 @@ class VAE(nn.Module):
             config.latent_dim,
             config.decoder_blocks,
             config.batch_norm,
-            config.track_running_stats,
         )
 
         self.encoder.apply(init_weights)

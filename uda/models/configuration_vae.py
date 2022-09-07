@@ -15,4 +15,3 @@ class VAEConfig(Config):
     dim: int = 2
     use_pooling: bool = False
     batch_norm: bool = False
-    track_running_stats: bool = True
