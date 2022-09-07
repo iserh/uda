@@ -3,6 +3,7 @@ from math import floor
 from pathlib import Path
 from typing import Union
 
+import ignite.distributed as idist
 import numpy as np
 import torch
 import torch.nn as nn
@@ -152,5 +153,5 @@ class VAE(nn.Module):
             config = VAEConfig.from_file(config)
 
         model = cls(config)
-        model.load_state_dict(torch.load(path))
+        model.load_state_dict(torch.load(path, map_location=idist.device()))
         return model

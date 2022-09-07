@@ -63,11 +63,12 @@ def evaluate(
             wandb.run.summary[f"{split}/surface_dice/{i}"] = sf_dsc
 
 
-def cross_evaluate(
+def evaluate_vendors(
     Engine: type[Engine],
     Model: Union[type[VAE], type[UNet]],
     dataset: UDADataset,
     hparams: HParams,
+    vendors: list[str],
     n_predictions: int = 6,
 ) -> None:
     print()
@@ -76,7 +77,7 @@ def cross_evaluate(
     run_dir = Path(wandb.run.dir)
     model = Model.from_pretrained(run_dir / "best_model.pt", run_dir / "config" / "model.yaml")
 
-    for vendor in dataset.vendors:
+    for vendor in vendors:
         dataset.vendor = vendor
         dataset.setup()
 

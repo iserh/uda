@@ -20,6 +20,7 @@ class UDADataset(ABC):
     artifact_name: Optional[str] = None
 
     class_labels: dict[int, str]
+    vendors: list[str]
     config: Config
     imsize: Optional[tuple[int, int, int]]
     patch_size: Optional[tuple[int, int, int]]

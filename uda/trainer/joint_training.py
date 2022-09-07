@@ -7,7 +7,7 @@ import torch.nn as nn
 from ignite.engine import Engine, Events
 from ignite.handlers import EarlyStopping, ModelCheckpoint
 from ignite.metrics import ConfusionMatrix, DiceCoefficient, Loss, Metric
-from ignite.utils import convert_tensor
+from ignite.utils import convert_tensor, to_onehot
 from torch.utils.data import DataLoader
 
 from ..transforms import CenterPad, center_pad
@@ -33,7 +33,7 @@ class JointEvaluator(BaseEvaluator):
 
         y_vae = self.vae_cropping(y_pred)
         y_rec, _, _ = self.vae(y_vae)
-        y_rec = indices_from_prediction(y_rec)
+        y_rec = binarize_prediction(y_rec)
 
         y_true = center_pad(y_true, y_pred.shape[2:])
         y_vae = center_pad(y_vae, y_rec.shape[2:])
@@ -135,7 +135,7 @@ class JointTrainer(BaseEvaluator):
         with torch.no_grad():
             y_vae = self.vae_cropping(y_pred)
             y_rec, _, _ = self.vae(y_vae)
-            y_rec = indices_from_prediction(y_rec)
+            y_rec = binarize_prediction(y_rec)
 
         y_true = center_pad(y_true, y_pred.shape[2:])
         y_vae = center_pad(y_vae, y_rec.shape[2:])
@@ -151,11 +151,12 @@ class JointTrainer(BaseEvaluator):
         return pseudo_loss, rec_loss
 
 
-def indices_from_prediction(t: torch.FloatTensor) -> torch.LongTensor:
-    if t.shape[1] == 1:
-        return t.sigmoid().round().long().squeeze(1)
+def binarize_prediction(t: torch.FloatTensor) -> torch.LongTensor:
+    num_classes = t.shape[1]
+    if num_classes == 1:  # binary segmentation
+        return t.sigmoid().round()
     else:
-        return t.argmax(1)
+        return to_onehot(t.argmax(1), num_classes).float()
 
 
 def joint_standard_metrics(loss_fn: nn.Module, num_classes: int, lambd: float) -> dict[str, Metric]:

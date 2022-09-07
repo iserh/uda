@@ -11,3 +11,28 @@ If you want to use the `wandb_utils` integrations please install with extra (dou
 ```sh
 pip install ".[wandb]"
 ```
+
+Configure runs by writing a launch.yaml, e.g.:
+```yml
+dataset: MAndMs
+vendors:
+- Philips
+- Siemens
+- Canon
+- GE
+vaes:
+  Philips: iserh/UDA-MAndMs-VAE/2h2vsaj2
+teachers:
+  Philips: iserh/UDA-MAndMs/14ampz76
+download-model: true
+data-root: /tmp/data
+config-dir: config
+project: UDA-MAndMs
+tags:
+- example_tag
+group: Domain-Adaptation
+wandb: true
+evaluate: true
+evaluate-vendors: true
+store-model: true
+```

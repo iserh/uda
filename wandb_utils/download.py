@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+import os
 import shutil
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -15,14 +16,15 @@ from wandb_utils.config import RunConfig
 
 
 def _move_all_files(src: str, dest: str) -> None:
-    dest = Path(dest)
-    src = Path(src)
+    dest: Path = Path(dest)
+    src: Path = Path(src)
 
-    if dest.exists():
-        shutil.rmtree(dest)
-    dest.mkdir(parents=True)
+    dest.mkdir(parents=True, exist_ok=True)
 
     for file_path in src.iterdir():
+        if (dest / file_path.name).exists():
+            os.remove(dest / file_path.name)
+
         shutil.move(file_path, dest)
 
 

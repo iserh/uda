@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from enum import Enum
+from pathlib import Path
 from typing import Any
 
 import yaml
@@ -10,6 +11,13 @@ class EnumDumper(yaml.SafeDumper):
     def represent_data(self, data: Any) -> Node:
         if isinstance(data, Enum):
             return self.represent_data(data.name)
+
+        if isinstance(data, Path):
+            return self.represent_data(str(data))
+
+        if isinstance(data, type):
+            return self.represent_data(data.__name__)
+
         return super(EnumDumper, self).represent_data(data)
 
 

@@ -2,6 +2,7 @@
 from pathlib import Path
 from typing import Union
 
+import ignite.distributed as idist
 import torch
 import torch.nn as nn
 
@@ -119,5 +120,5 @@ class UNet(nn.Module):
             config = UNetConfig.from_file(config)
 
         model = cls(config)
-        model.load_state_dict(torch.load(path))
+        model.load_state_dict(torch.load(path, map_location=idist.device()))
         return model

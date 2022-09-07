@@ -25,7 +25,7 @@ def run(teacher: UNet, vae: VAE, dataset: UDADataset, hparams: HParams, use_wand
     train_loader = teacher_data.train_dataloader(hparams.val_batch_size)
     val_loader = teacher_data.val_dataloader(hparams.val_batch_size)  # pseudo labels
     true_val_loader = dataset.val_dataloader(hparams.val_batch_size)  # real labels
-    test_loader = dataset.test_dataloader(hparams.val_batch_size)
+    test_loader = dataset.test_dataloader(hparams.val_batch_size) if dataset.has_split("testing") else None
 
     model = UNet(teacher.config)
     model.load_state_dict(teacher.state_dict())  # copy weights
@@ -55,7 +55,8 @@ def run(teacher: UNet, vae: VAE, dataset: UDADataset, hparams: HParams, use_wand
     ProgressBar(desc="Train(Eval)", persist=True).attach(trainer.train_evaluator)
     ProgressBar(desc="Val(Pseudo)", persist=True).attach(trainer.pseudo_val_evaluator)
     ProgressBar(desc="Val", persist=True).attach(trainer.val_evaluator)
-    ProgressBar(desc="Test", persist=True).attach(trainer.test_evaluator)
+    if hasattr(trainer, "test_evaluator"):
+        ProgressBar(desc="Test", persist=True).attach(trainer.test_evaluator)
 
     if use_wandb:
         # log model size
@@ -70,9 +71,27 @@ def run(teacher: UNet, vae: VAE, dataset: UDADataset, hparams: HParams, use_wand
             tag="training",
             output_transform=lambda o: {"pseudo_batchloss": o[0], "rec_batchloss": o[1]},
         )
+
+        evaluators = [
+            ("training", trainer.train_evaluator),
+            ("pseudo_validation", trainer.pseudo_val_evaluator),
+            ("validation", trainer.val_evaluator),
+        ]
+        if hasattr(trainer, "test_evaluator"):
+            evaluators.append(("testing", trainer.test_evaluator))
+
+        for tag, evaluator in evaluators:
+            wandb_logger.attach_output_handler(
+                evaluator,
+                event_name=Events.EPOCH_COMPLETED,
+                tag=tag,
+                metric_names=list(trainer.metrics.keys()),
+                global_step_transform=lambda *_: trainer.state.iteration,
+            )
+
         # wandb table evaluation
         trainer.add_event_handler(
-            event_name=Events.EPOCH_COMPLETED(every=hparams.epochs // 10),
+            event_name=Events.EPOCH_COMPLETED,  # (every=hparams.epochs // 10),
             handler=prediction_image_plot,
             evaluator=trainer.val_evaluator,
             dataset=dataset,
@@ -84,90 +103,71 @@ def run(teacher: UNet, vae: VAE, dataset: UDADataset, hparams: HParams, use_wand
         )
         eos.attach(trainer.val_evaluator, "output")
 
-        for tag, evaluator in [
-            ("training", trainer.train_evaluator),
-            ("pseudo_validation", trainer.pseudo_val_evaluator),
-            ("validation", trainer.val_evaluator),
-            ("testing", trainer.test_evaluator),
-        ]:
-            wandb_logger.attach_output_handler(
-                evaluator,
-                event_name=Events.EPOCH_COMPLETED,
-                tag=tag,
-                metric_names=list(trainer.metrics.keys()),
-                global_step_transform=lambda *_: trainer.state.iteration,
-            )
-
     # kick everything off
     trainer.run(dataset.train_dataloader(hparams.train_batch_size), max_epochs=hparams.epochs)
 
 
 if __name__ == "__main__":
-    from commons import get_args
+    from commons import get_launch_config, get_model
 
-    args = get_args()
+    launch = get_launch_config()
 
     # load configuration
-    hparams = HParams.from_file(args.config_dir / "hparams.yaml")
-    dataset: UDADataset = args.dataset(args.config_dir / "dataset.yaml", root=args.data_root)
+    hparams = HParams.from_file(launch.config_dir / "hparams.yaml")
+    dataset: UDADataset = launch.dataset(launch.config_dir / "dataset.yaml", root=launch.data_root)
+    # load models
+    vae, vae_path = get_model(launch.vae, launch.download_model, model_cls=VAE)
+    teacher, teacher_path = get_model(launch.teacher, launch.download_model, model_cls=UNet)
 
-    if args.wandb:
-        import wandb
-        from evaluation import cross_evaluate, evaluate
+    # finetune on all given vendors
+    for vendor in launch.vendors:
+        dataset.config.vendor = vendor
+        dataset.vendor = vendor
 
-        from uda.trainer import SegEvaluator
-        from wandb_utils import RunConfig, delete_model_binaries, download_dataset, download_model
+        if launch.wandb:
+            import wandb
+            from evaluation import evaluate, evaluate_vendors
 
-        if args.dl_model:
-            vae_run = RunConfig.parse_path(args.vae_path)
-            teacher_run = RunConfig.parse_path(args.teacher_path)
-            vae_path = download_model(vae_run, path="/tmp/models/vae").parent
-            teacher_path = download_model(teacher_run, path="/tmp/models/teacher").parent
-        else:
-            vae_path = Path(args.vae_path)
-            teacher_path = Path(args.teacher_path)
+            from uda.trainer import SegEvaluator
+            from wandb_utils import RunConfig, delete_model_binaries, download_dataset
+
             vae_run = RunConfig.from_file(vae_path / "run_config.yaml")
             teacher_run = RunConfig.from_file(teacher_path / "run_config.yaml")
+            teacher_dataset = launch.dataset(teacher_path / "dataset.yaml")
 
-        vae = VAE.from_pretrained(vae_path / "best_model.pt")
-        teacher = UNet.from_pretrained(teacher_path / "best_model.pt")
-        teacher_ds_cfg = args.dataset(teacher_path / "dataset.yaml").config
+            with wandb.init(
+                project=launch.project,
+                tags=launch.tags,
+                group=launch.group,
+                config={
+                    "hparams": hparams.__dict__,
+                    "dataset": dataset.config.__dict__,
+                    "model": teacher.config.__dict__,
+                    "vae": vae.config.__dict__,
+                    "teacher_dataset": teacher_dataset.config.__dict__,
+                    "teacher_run": teacher_run.__dict__,
+                    "vae_run": vae_run.__dict__,
+                },
+            ) as r:
+                run_cfg = RunConfig(r.id, r.project)
+                r.log_code()
+                # save the configuration to the wandb run dir
+                cfg_dir = Path(r.dir) / "config"
+                cfg_dir.mkdir()
+                launch.save(cfg_dir / "launch.yaml")
+                hparams.save(cfg_dir / "hparams.yaml")
+                teacher.config.save(cfg_dir / "model.yaml")
+                dataset.config.save(cfg_dir / "dataset.yaml")
 
-        with wandb.init(
-            project=args.project,
-            tags=args.tags,
-            group=args.group,
-            config={
-                "hparams": hparams.__dict__,
-                "dataset": dataset.config.__dict__,
-                "model": teacher.config.__dict__,
-                "vae": vae.config.__dict__,
-                "teacher_dataset": teacher_ds_cfg.__dict__,
-                "teacher_run": teacher_run.__dict__,
-                "vae_run": vae_run.__dict__,
-            },
-        ) as r:
-            run_cfg = RunConfig(r.id, r.project)
-            r.log_code()
-            # save the configuration to the wandb run dir
-            cfg_dir = Path(r.dir) / "config"
-            cfg_dir.mkdir()
-            hparams.save(cfg_dir / "hparams.yaml")
-            teacher.config.save(cfg_dir / "model.yaml")
-            dataset.config.save(cfg_dir / "dataset.yaml")
+                download_dataset(dataset)
+                run(teacher, vae, dataset, hparams, use_wandb=True)
 
-            download_dataset(dataset)
-            run(teacher, vae, dataset, hparams, use_wandb=True)
+                if launch.evaluate:
+                    evaluate(SegEvaluator, UNet, dataset, hparams, splits=["validation", "testing"])
+                if launch.evaluate_vendors:
+                    evaluate_vendors(SegEvaluator, UNet, dataset, hparams, vendors=[dataset.vendor])
 
-            if args.evaluate:
-                evaluate(SegEvaluator, UNet, dataset, hparams, splits=["validation", "testing"])
-            if args.cross_eval:
-                cross_evaluate(SegEvaluator, UNet, dataset, hparams)
-
-        if not args.store:
-            delete_model_binaries(run_cfg)
-    else:
-        vae = VAE.from_pretrained(Path(args.vae_path) / "best_model.pt")
-        teacher = UNet.from_pretrained(Path(args.teacher_path) / "best_model.pt")
-
-        run(teacher, vae, dataset, hparams, use_wandb=False)
+            if not launch.store_model:
+                delete_model_binaries(run_cfg)
+        else:
+            run(teacher, vae, dataset, hparams, use_wandb=False)

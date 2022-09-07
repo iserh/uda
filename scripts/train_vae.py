@@ -77,26 +77,26 @@ def run(dataset: UDADataset, hparams: HParams, model_config: VAEConfig, use_wand
 
 
 if __name__ == "__main__":
-    from commons import get_args
+    from commons import get_launch_config
 
-    args = get_args()
+    launch = get_launch_config()
 
     # load configuration
-    hparams = HParams.from_file(args.config_dir / "hparams.yaml")
-    model_config = VAEConfig.from_file(args.config_dir / "model.yaml")
-    dataset: UDADataset = args.dataset(args.config_dir / "dataset.yaml", root=args.data_root)
+    hparams = HParams.from_file(launch.config_dir / "hparams.yaml")
+    model_config = VAEConfig.from_file(launch.config_dir / "model.yaml")
+    dataset: UDADataset = launch.dataset(launch.config_dir / "dataset.yaml", root=launch.data_root)
 
-    if args.wandb:
+    if launch.wandb:
         import wandb
-        from evaluation import cross_evaluate, evaluate
+        from evaluation import evaluate, evaluate_vendors
 
         from uda.trainer import VaeEvaluator
         from wandb_utils import RunConfig, delete_model_binaries, download_dataset
 
         with wandb.init(
-            project=args.project,
-            tags=args.tags,
-            group=args.group,
+            project=launch.project,
+            tags=launch.tags,
+            group=launch.group,
             config={
                 "hparams": hparams.__dict__,
                 "dataset": dataset.config.__dict__,
@@ -115,12 +115,12 @@ if __name__ == "__main__":
             download_dataset(dataset)
             run(dataset, hparams, model_config, use_wandb=True)
 
-            if args.evaluate:
+            if launch.evaluate:
                 evaluate(VaeEvaluator, VAE, dataset, hparams, splits=["validation", "testing"])
-            if args.cross_eval:
-                cross_evaluate(VaeEvaluator, VAE, dataset, hparams)
+            if launch.evaluate_vendors:
+                evaluate_vendors(VaeEvaluator, VAE, dataset, hparams, dataset.vendors)
 
-        if not args.store:
+        if not launch.store_model:
             delete_model_binaries(run_cfg)
     else:
         run(dataset, hparams, model_config, use_wandb=False)
