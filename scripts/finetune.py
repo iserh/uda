@@ -125,7 +125,7 @@ if __name__ == "__main__":
         teacher_dataset = launch.dataset(teacher_path / "dataset.yaml")
     # load models
     vae = VAE.from_pretrained(vae_path / "best_model.pt")
-    teacher = VAE.from_pretrained(teacher_path / "best_model.pt")
+    teacher = UNet.from_pretrained(teacher_path / "best_model.pt")
 
     # finetune on all given vendors
     for vendor in launch.vendors:
