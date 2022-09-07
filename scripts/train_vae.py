@@ -64,7 +64,7 @@ def run(dataset: UDADataset, hparams: HParams, model_config: VAEConfig, use_wand
 
         # wandb table evaluation
         trainer.add_event_handler(
-            event_name=Events.EPOCH_COMPLETED(every=n_epochs // 10),
+            event_name=Events.EPOCH_COMPLETED(every=max(n_epochs // 10, 1)),
             handler=prediction_image_plot,
             evaluator=trainer.val_evaluator,
             dataset=dataset,
