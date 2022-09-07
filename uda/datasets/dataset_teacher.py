@@ -5,8 +5,8 @@ import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
 from tqdm import tqdm
 
-from .base import UDADataset
 from ..transforms import binarize_prediction
+from .base import UDADataset
 
 
 class TeacherData:

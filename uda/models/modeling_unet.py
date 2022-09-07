@@ -85,9 +85,7 @@ class UNet(nn.Module):
         super(UNet, self).__init__()
         self.config = config
 
-        self.encoder = UNetEncoder(
-            config.dim, config.encoder_blocks, config.use_pooling, config.batch_norm
-        )
+        self.encoder = UNetEncoder(config.dim, config.encoder_blocks, config.use_pooling, config.batch_norm)
         self.decoder = UNetDecoder(
             config.dim,
             config.out_channels,

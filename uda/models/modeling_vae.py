@@ -76,9 +76,7 @@ class VAEDecoder(nn.Module):
         self.hidden_size = [blocks[0][0]] + [size // (2 ** len(blocks)) for size in output_size]
 
         self.linear = nn.Linear(latent_dim, np.prod(self.hidden_size))
-        self.upsample_blocks = nn.Sequential(
-            *[UpsampleBlock(dim, channels, batch_norm) for channels in blocks]
-        )
+        self.upsample_blocks = nn.Sequential(*[UpsampleBlock(dim, channels, batch_norm) for channels in blocks])
         self.out_block = ConvNd(
             dim=dim,
             in_channels=blocks[-1][-1],

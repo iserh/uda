@@ -50,6 +50,14 @@ class MAndMs(UDADataset):
 
     def setup(self) -> None:
         """Load data from disk and preprocess."""
+        # free some memory
+        if hasattr(self, "train_split"):
+            del self.train_split
+        if hasattr(self, "val_split"):
+            del self.val_split
+        if hasattr(self, "test_split"):
+            del self.test_split
+
         self._load_train_val_files()
         self._load_test_files()
 

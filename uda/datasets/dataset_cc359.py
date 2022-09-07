@@ -47,6 +47,12 @@ class CC359(UDADataset):
 
     def setup(self) -> None:
         """Load data from disk, preprocess and split."""
+        # free some memory
+        if hasattr(self, "train_split"):
+            del self.train_split
+        if hasattr(self, "val_split"):
+            del self.val_split
+
         images_dir = self.root / "Original" / self.vendor
         labels_dir = self.root / "Silver-standard" / self.vendor
 

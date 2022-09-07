@@ -26,9 +26,7 @@ class ConvWithNorm(nn.Module):
             padding=padding,
             stride=stride,
         )
-        self.norm = (
-            BatchNormNd(dim, out_channels) if batch_norm else nn.Identity()
-        )
+        self.norm = BatchNormNd(dim, out_channels) if batch_norm else nn.Identity()
         self.activation = nn.ReLU(inplace=True)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
