@@ -22,10 +22,8 @@ def run(teacher: UNet, vae: VAE, dataset: UDADataset, hparams: HParams, use_wand
     teacher_data = TeacherData(teacher, dataset)
     teacher_data.setup(hparams.val_batch_size)
 
-    train_loader = teacher_data.train_dataloader(hparams.val_batch_size)
-    val_loader = teacher_data.val_dataloader(hparams.val_batch_size)  # pseudo labels
-    true_val_loader = dataset.val_dataloader(hparams.val_batch_size)  # real labels
-    test_loader = dataset.test_dataloader(hparams.val_batch_size) if dataset.has_split("testing") else None
+    train_loader = teacher_data.train_dataloader(hparams.train_batch_size)
+    n_epochs = hparams.max_steps // len(train_loader)
 
     model = UNet(teacher.config)
     model.load_state_dict(teacher.state_dict())  # copy weights
@@ -42,10 +40,10 @@ def run(teacher: UNet, vae: VAE, dataset: UDADataset, hparams: HParams, use_wand
         schedule=schedule,
         loss_fn=loss_fn,
         lambd=hparams.vae_lambd,
-        train_loader=train_loader,
-        pseudo_val_loader=val_loader,  # pseudo labels
-        val_loader=true_val_loader,  # real labels
-        test_loader=test_loader,
+        train_loader=teacher_data.train_dataloader(hparams.val_batch_size),
+        pseudo_val_loader=teacher_data.val_dataloader(hparams.val_batch_size),  # pseudo labels
+        val_loader=dataset.val_dataloader(hparams.val_batch_size),  # real labels
+        test_loader=dataset.test_dataloader(hparams.val_batch_size) if dataset.has_split("testing") else None,
         patience=hparams.early_stopping_patience,
         metrics=joint_standard_metrics(loss_fn, len(dataset.class_labels), hparams.vae_lambd),
         cache_dir=wandb.run.dir if use_wandb else "/tmp/models/student",
@@ -62,6 +60,7 @@ def run(teacher: UNet, vae: VAE, dataset: UDADataset, hparams: HParams, use_wand
         # log model size
         n_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
         wandb.summary.update({"n_parameters": n_params})
+        wandb.summary.update({"n_epochs": n_epochs})
 
         # wandb logger
         wandb_logger = WandBLogger(id=wandb.run.id)
@@ -91,7 +90,7 @@ def run(teacher: UNet, vae: VAE, dataset: UDADataset, hparams: HParams, use_wand
 
         # wandb table evaluation
         trainer.add_event_handler(
-            event_name=Events.EPOCH_COMPLETED,  # (every=hparams.epochs // 10),
+            event_name=Events.EPOCH_COMPLETED(every=n_epochs // 10),
             handler=prediction_image_plot,
             evaluator=trainer.val_evaluator,
             dataset=dataset,
@@ -104,7 +103,7 @@ def run(teacher: UNet, vae: VAE, dataset: UDADataset, hparams: HParams, use_wand
         eos.attach(trainer.val_evaluator, "output")
 
     # kick everything off
-    trainer.run(dataset.train_dataloader(hparams.train_batch_size), max_epochs=hparams.epochs)
+    trainer.run(train_loader, max_epochs=n_epochs)
 
 
 if __name__ == "__main__":

@@ -45,7 +45,7 @@ class HParams(Config):
     `vae_beta`: Beta value for KL loss
     """
 
-    epochs: int = 10
+    max_steps: int = 8192
     criterion: str = "BCE"
     optimizer: str = "Adam"
     learning_rate: float = 1e-4

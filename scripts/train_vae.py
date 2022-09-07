@@ -18,6 +18,8 @@ def run(dataset: UDADataset, hparams: HParams, model_config: VAEConfig, use_wand
         import wandb
 
     dataset.setup()
+    train_loader = dataset.train_dataloader(hparams.train_batch_size)
+    n_epochs = hparams.max_steps // len(train_loader)
 
     model = VAE(model_config)
     optim = get_optimizer_cls(hparams.optimizer)(model.parameters(), lr=hparams.learning_rate)
@@ -61,7 +63,7 @@ def run(dataset: UDADataset, hparams: HParams, model_config: VAEConfig, use_wand
 
         # wandb table evaluation
         trainer.add_event_handler(
-            event_name=Events.EPOCH_COMPLETED(every=hparams.epochs // 10),
+            event_name=Events.EPOCH_COMPLETED(every=n_epochs // 10),
             handler=prediction_image_plot,
             evaluator=trainer.val_evaluator,
             dataset=dataset,
@@ -73,7 +75,7 @@ def run(dataset: UDADataset, hparams: HParams, model_config: VAEConfig, use_wand
         )
         eos.attach(trainer.val_evaluator, "output")
 
-    trainer.run(dataset.train_dataloader(hparams.train_batch_size), max_epochs=hparams.epochs)
+    trainer.run(train_loader, max_epochs=n_epochs)
 
 
 if __name__ == "__main__":
