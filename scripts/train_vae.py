@@ -44,6 +44,7 @@ def run(dataset: UDADataset, hparams: HParams, model_config: VAEConfig, use_wand
         n_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
         wandb.summary.update({"n_parameters": n_params})
         wandb.summary.update({"model_size": "Large" if len(model_config.encoder_blocks) == 6 else "Small"})
+        wandb.summary.update({"n_epochs": n_epochs})
 
         # wandb logger
         wandb_logger = WandBLogger(id=wandb.run.id)

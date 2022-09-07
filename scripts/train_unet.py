@@ -50,6 +50,7 @@ def run(dataset: UDADataset, hparams: HParams, model_config: UNetConfig, use_wan
         # log model size
         n_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
         wandb.summary.update({"n_parameters": n_params})
+        wandb.summary.update({"n_epochs": n_epochs})
 
         # wandb logger
         wandb_logger = WandBLogger(id=wandb.run.id)
