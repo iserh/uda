@@ -144,6 +144,7 @@ if __name__ == "__main__":
                 tags=launch.tags,
                 group=launch.group,
                 config={
+                    "info": "Domain-Adaption",
                     "hparams": hparams.__dict__,
                     "dataset": dataset.config.__dict__,
                     "model": teacher.config.__dict__,
