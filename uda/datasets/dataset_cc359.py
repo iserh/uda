@@ -27,7 +27,7 @@ class CC359(UDADataset):
 
     artifact_name = "iserh/UDA-Datasets/CC359-Skull-stripping:latest"
     class_labels = {0: "Background", 1: "brain"}
-    vendors = ["Philips", "Siemens", "GE"]
+    vendors = ["Philips_3", "Philips_15", "Siemens_3", "Siemens_15", "GE_3", "GE_15"]
 
     def __init__(self, config: Union[CC359Config, str], root: str = "/tmp/data") -> None:
         if not isinstance(config, CC359Config):
